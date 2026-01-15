@@ -2,32 +2,44 @@
 
 namespace Rendering {
     DefaultView:: DefaultView() {
-        // Constructor - initialize any view-specific data here
+        // Constructor
     }
     
     void DefaultView::render() {
-        // Create a simple window
-        ImGui::Begin("Default View");
+        // Make the window fill the entire viewport
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->WorkPos);
+        ImGui::SetNextWindowSize(viewport->WorkSize);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        
+        // No title bar, no resize, no move
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | 
+                                 ImGuiWindowFlags_NoMove | 
+                                 ImGuiWindowFlags_NoResize |
+                                 ImGuiWindowFlags_NoBringToFrontOnFocus;
+        
+        ImGui:: Begin("MainView", nullptr, flags);
         
         ImGui::Text("Welcome to ImGui Viewer!");
         ImGui:: Separator();
         
         ImGui::TextWrapped(
-            "This is a bare-bones ImGui application using GLFW and OpenGL.  "
-            "It uses a view-based architecture that makes it easy to add new views."
+            "This view fills the whole window. "
+            "Add all your ImGui code right here in the render() function."
         );
         
         ImGui:: Spacing();
         
-        if (ImGui::CollapsingHeader("Getting Started")) {
-            ImGui:: BulletText("Create new view classes by inheriting from Rendering::View");
-            ImGui::BulletText("Override the render() method to define your UI");
-            ImGui::BulletText("Use app.setView() to switch between views");
+        if (ImGui::Button("Switch to Another View")) {
+            // Example: Post event to switch views
+            // EventQueue::getInstance().post(
+            //     Event_ptr(new SetViewEvent(std::make_shared<AnotherView>()))
+            // );
         }
         
-        ImGui::Spacing();
-        ImGui::Text("Application average %. 3f ms/frame (%.1f FPS)", 
-                    1000.0f / ImGui:: GetIO().Framerate, 
+        ImGui:: Spacing();
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 
+                    1000.0f / ImGui::GetIO().Framerate, 
                     ImGui::GetIO().Framerate);
         
         ImGui::End();

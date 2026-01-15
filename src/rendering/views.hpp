@@ -2,23 +2,33 @@
 #define VIEWS_H
 
 #include <memory>
-#include <vector>
+#include "util/events.hpp"
 
 namespace Rendering {
     /**
-     * Base class for all views in the application
-     * Views represent different screens/pages in your application
+     * Base class for all views
      */
     class View {
     public:
         View() = default;
         virtual ~View() = default;
         
-        /**
-         * Main rendering function that should be overridden by derived views
-         * This is called every frame to render the view's UI
-         */
         virtual void render() = 0;
+    };
+    
+    /**
+     * Event for switching views
+     */
+    class SetViewEvent : public Event {
+    private:
+        std::shared_ptr<View> view_;
+        
+    public:
+        explicit SetViewEvent(std::shared_ptr<View> view) 
+            : Event("views/set_view")
+            , view_(std::move(view)) {}
+        
+        std::shared_ptr<View> getView() { return view_; }
     };
 }
 

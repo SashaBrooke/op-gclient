@@ -5,10 +5,6 @@
 #include "imgui.h"
 
 namespace Rendering {
-    /**
-     * Default view that shows a simple window with text
-     * This serves as a template for creating new views
-     */
     class DefaultView : public View {
     public:
         DefaultView();

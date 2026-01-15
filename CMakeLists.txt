@@ -15,6 +15,8 @@ set(SOURCES
     src/application.cpp
     src/rendering/views.cpp
     src/rendering/views/default_view.cpp
+    src/util/events.cpp
+    src/util/window_handler.cpp
 )
 
 # Create executable

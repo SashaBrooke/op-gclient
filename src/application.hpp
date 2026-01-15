@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 #include "imgui.h"
 #include "rendering/views.hpp"
+#include "util/events.hpp"
 
 class Application {
 private:
@@ -17,8 +18,7 @@ private:
     
     std::shared_ptr<Rendering::View> current_view_;
     
-    // ImGui configuration flags
-    ImGuiConfigFlags config_flags_;
+    Listener view_change_listener_;
     
     void initGLFW();
     void initGL3W();
@@ -31,7 +31,6 @@ public:
     Application(std::string window_title, int width, int height);
     ~Application();
     
-    // Delete copy constructor and assignment operator
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
     
