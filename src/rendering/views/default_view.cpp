@@ -1,7 +1,7 @@
 #include "rendering/views/default_view.hpp"
 
 namespace Rendering {
-    DefaultView:: DefaultView() {
+    DefaultView::DefaultView() {
         // Constructor
     }
     
@@ -18,17 +18,17 @@ namespace Rendering {
                                  ImGuiWindowFlags_NoResize |
                                  ImGuiWindowFlags_NoBringToFrontOnFocus;
         
-        ImGui:: Begin("MainView", nullptr, flags);
+        ImGui::Begin("MainView", nullptr, flags);
         
         ImGui::Text("Welcome to ImGui Viewer!");
-        ImGui:: Separator();
+        ImGui::Separator();
         
         ImGui::TextWrapped(
             "This view fills the whole window. "
             "Add all your ImGui code right here in the render() function."
         );
         
-        ImGui:: Spacing();
+        ImGui::Spacing();
         
         if (ImGui::Button("Switch to Another View")) {
             // Example: Post event to switch views
@@ -37,7 +37,7 @@ namespace Rendering {
             // );
         }
         
-        ImGui:: Spacing();
+        ImGui::Spacing();
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 
                     1000.0f / ImGui::GetIO().Framerate, 
                     ImGui::GetIO().Framerate);

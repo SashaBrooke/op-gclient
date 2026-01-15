@@ -17,6 +17,7 @@ set(SOURCES
     src/rendering/views/default_view.cpp
     src/util/events.cpp
     src/util/window_handler.cpp
+    src/util/logging.cpp
 )
 
 # Create executable
@@ -36,6 +37,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     imgui
     glfw
     gl3w
+    spdlog::spdlog
     ${CMAKE_DL_LIBS}
 )
 

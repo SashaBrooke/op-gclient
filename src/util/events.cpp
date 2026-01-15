@@ -22,7 +22,7 @@ void EventQueue::pollEvents() {
     std::lock_guard<std::recursive_mutex> event_guard(event_mutex_);
     
     while (!event_queue_.empty()) {
-        Event_ptr event = event_queue_. front();
+        Event_ptr event = event_queue_.front();
         
         std::lock_guard<std::recursive_mutex> listener_guard(listeners_mutex_);
         for (const auto& listener : listeners_) {
@@ -31,7 +31,7 @@ void EventQueue::pollEvents() {
             }
         }
         
-        event_queue_. pop();
+        event_queue_.pop();
     }
 }
 

@@ -26,3 +26,6 @@ add_subdirectory(glfw)
 set(GL3W_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gl3w)
 add_library(gl3w STATIC ${GL3W_DIR}/src/gl3w.c)
 target_include_directories(gl3w PUBLIC ${GL3W_DIR}/include)
+
+# spdlog
+add_subdirectory(spdlog)

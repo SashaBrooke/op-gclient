@@ -53,50 +53,7 @@ src/
 ├── rendering/
 │   ├── views.hpp/cpp             # Base view class
 │   └── views/
-│       └── default_view.hpp/cpp  # Default view implementation
+│       └── xxx_view.hpp/cpp      # Place view implementations here
 └── util/
-    └── rect.hpp                  # Utility structures
+    └── xxx_util.hpp/cpp          # Place utilities here
 ```
-
-## Creating New Views
-
-To create a new view: 
-
-1. Create a new header file in `src/rendering/views/`:
-```cpp
-#ifndef MY_VIEW_H
-#define MY_VIEW_H
-
-#include "rendering/views.hpp"
-
-namespace Rendering {
-    class MyView : public View {
-    public:
-        MyView();
-        ~MyView() override = default;
-        void render() override;
-    };
-}
-
-#endif
-```
-
-2. Implement the view in a corresponding `.cpp` file:
-```cpp
-#include "rendering/views/my_view.hpp"
-
-namespace Rendering {
-    MyView::MyView() {
-        // Initialize view
-    }
-    
-    void MyView::render() {
-        ImGui::Begin("My View");
-        // Add your ImGui code here
-        ImGui::End();
-    }
-}
-```
-
-3. Add the source file to `CMakeLists.txt`
-4. Switch to your view using `app.setView(std::make_shared<Rendering:: MyView>())`

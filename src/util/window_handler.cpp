@@ -9,7 +9,7 @@ void WindowHandler::setMainWindow(GLFWwindow* window) {
     windows_[window] = {window, 0, nullptr};
 }
 
-GLFWwindow* WindowHandler:: createWindow(const std::string& title, int width, int height,
+GLFWwindow* WindowHandler::createWindow(const std::string& title, int width, int height,
                                         std::function<void()> render_callback, int z_index) {
     if (! main_window_) {
         return nullptr;
@@ -44,7 +44,7 @@ void WindowHandler::removeWindow(GLFWwindow* window) {
     }
 }
 
-void WindowHandler:: renderAll() {
+void WindowHandler::renderAll() {
     for (auto& [window, info] :  windows_) {
         if (window == main_window_) {
             continue; // Main window is rendered by Application
@@ -65,7 +65,7 @@ void WindowHandler:: renderAll() {
             info.render_callback();
         }
         
-        ImGui:: Render();
+        ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
