@@ -76,6 +76,11 @@ void Application::initImGui() {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     log_debug("ImGui docking and viewports enabled");
+
+    // Handle high DPI displays
+    float xscale, yscale;
+    glfwGetWindowContentScale(window_, &xscale, &yscale);
+    log_info("Display scale: {}x, {}y", xscale, yscale);
     
     ImGui::StyleColorsDark();
     
@@ -84,9 +89,38 @@ void Application::initImGui() {
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
+
+    // Scale UI for high DPI BEFORE initializing backends
+    if (xscale > 1.0f || yscale > 1.0f) {
+        float scale = std::max(xscale, yscale);
+        style.ScaleAllSizes(scale);
+        log_debug("Scaled ImGui style by {}", scale);
+    }
     
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    // Load default font at higher resolution for DPI
+    if (xscale > 1.0f || yscale > 1.0f) {
+        float scale = std::max(xscale, yscale);
+        
+        ImFontConfig font_config;
+        font_config.SizePixels = 13.0f * scale;  // Default size * DPI scale
+        font_config.OversampleH = 2;
+        font_config.OversampleV = 2;
+        
+        io.Fonts->Clear();
+        io.Fonts->AddFontDefault(&font_config);
+        io.Fonts->Build();
+        
+        // Update texture
+        unsigned char* pixels;
+        int width, height;
+        io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+        
+        log_debug("Loaded high-DPI font at {}px", font_config.SizePixels);
+    }
+
     log_info("ImGui initialized successfully");
 }
 
