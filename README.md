@@ -1,4 +1,4 @@
-# OhPossum Gimbal Client (OP-GClient)
+# OhPossum Gimbal Client (op-gclient)
 
 PC application used to control the OhPossum system.
 
