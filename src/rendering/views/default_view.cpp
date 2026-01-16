@@ -2,6 +2,7 @@
 #include "core/connection_manager.hpp"
 #include "util/logging.hpp"
 #include "imgui.h"
+#include <utility>
 
 namespace Rendering {
 
@@ -60,14 +61,41 @@ void DefaultView::render() {
         if (connection_type == 0) {
             // Serial connection
             static char port_buffer[128] = "/dev/ttyUSB0";
-            static int baud_rate = 115200;
+            
+            // Baud rate options
+            static const std::pair<const char*, int> baud_rate_options[] = {
+                {"9600", 9600},
+                {"19200", 19200},
+                {"38400", 38400},
+                {"57600", 57600},
+                {"115200", 115200},
+                {"230400", 230400},
+                {"460800", 460800},
+                {"921600", 921600}
+            };
+            static int baud_rate_index = 4;  // Default to 115200
             
             ImGui::InputText("Serial Port", port_buffer, sizeof(port_buffer));
-            ImGui::InputInt("Baud Rate", &baud_rate);
+            
+            // Baud rate dropdown
+            if (ImGui::BeginCombo("Baud Rate", baud_rate_options[baud_rate_index]. first)) {
+                for (int n = 0; n < IM_ARRAYSIZE(baud_rate_options); n++) {
+                    const bool is_selected = (baud_rate_index == n);
+                    if (ImGui::Selectable(baud_rate_options[n].first, is_selected)) {
+                        baud_rate_index = n;
+                    }
+                    
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
             
             if (ImGui::Button("Connect Serial")) {
-                log_info("Attempting to connect to serial port: {}", port_buffer);
-                conn.connectSerial(port_buffer, baud_rate);  // Use new API
+                int baud_rate = baud_rate_options[baud_rate_index].second;
+                log_info("Attempting to connect to serial port: {} at {} baud", port_buffer, baud_rate);
+                conn.connectSerial(port_buffer, baud_rate);
             }
         } else {
             // Network connection
