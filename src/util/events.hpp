@@ -1,5 +1,5 @@
-#ifndef EVENTS_H
-#define EVENTS_H
+#ifndef EVENTS_HPP
+#define EVENTS_HPP
 
 #include <string>
 #include <memory>
@@ -68,4 +68,4 @@ public:
     void pollEvents();
 };
 
-#endif // EVENTS_H
+#endif // EVENTS_HPP

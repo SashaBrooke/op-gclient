@@ -1,5 +1,5 @@
-#ifndef VIEWS_H
-#define VIEWS_H
+#ifndef VIEWS_HPP
+#define VIEWS_HPP
 
 #include <memory>
 #include "util/events.hpp"
@@ -32,4 +32,4 @@ namespace Rendering {
     };
 }
 
-#endif // VIEWS_H
+#endif // VIEWS_HPP

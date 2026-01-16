@@ -1,5 +1,5 @@
-#ifndef DEFAULT_VIEW_H
-#define DEFAULT_VIEW_H
+#ifndef DEFAULT_VIEW_HPP
+#define DEFAULT_VIEW_HPP
 
 #include "rendering/views.hpp"
 #include "imgui.h"
@@ -14,4 +14,4 @@ namespace Rendering {
     };
 }
 
-#endif // DEFAULT_VIEW_H
+#endif // DEFAULT_VIEW_HPP

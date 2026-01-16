@@ -1,5 +1,5 @@
-#ifndef WINDOW_HANDLER_H
-#define WINDOW_HANDLER_H
+#ifndef WINDOW_HANDLER_HPP
+#define WINDOW_HANDLER_HPP
 
 #include <GLFW/glfw3.h>
 #include <map>
@@ -42,4 +42,4 @@ public:
     GLFWwindow* getMainWindow() const { return main_window_; }
 };
 
-#endif // WINDOW_HANDLER_H
+#endif // WINDOW_HANDLER_HPP

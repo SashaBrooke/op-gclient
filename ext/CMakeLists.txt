@@ -24,6 +24,28 @@ add_subdirectory(glfw)
 
 # GL3W
 set(GL3W_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gl3w)
+
+# Check if gl3w has been generated
+if(NOT EXISTS "${GL3W_DIR}/src/gl3w.c")
+    message(STATUS "Generating gl3w...")
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} gl3w_gen.py
+        WORKING_DIRECTORY ${GL3W_DIR}
+        RESULT_VARIABLE GL3W_RESULT
+        OUTPUT_VARIABLE GL3W_OUTPUT
+        ERROR_VARIABLE GL3W_ERROR
+    )
+    
+    if(NOT GL3W_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to generate gl3w: ${GL3W_ERROR}")
+    else()
+        message(STATUS "gl3w generated successfully")
+    endif()
+else()
+    message(STATUS "gl3w already generated")
+endif()
+
 add_library(gl3w STATIC ${GL3W_DIR}/src/gl3w.c)
 target_include_directories(gl3w PUBLIC ${GL3W_DIR}/include)
 

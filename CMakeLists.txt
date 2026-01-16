@@ -18,6 +18,9 @@ set(SOURCES
     src/util/events.cpp
     src/util/window_handler.cpp
     src/util/logging.cpp
+    src/core/connection_manager.cpp
+    src/core/serial_connection.cpp
+    src/core/network_connection.cpp
 )
 
 # Create executable
