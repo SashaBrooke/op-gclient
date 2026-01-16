@@ -1,4 +1,4 @@
-#include "rendering/views/default_view.hpp"
+#include "rendering/views/gimbal_control_view.hpp"
 #include "core/connection_manager.hpp"
 #include "util/logging.hpp"
 #include "imgui.h"
@@ -6,11 +6,13 @@
 
 namespace Rendering {
 
-DefaultView::DefaultView() {
-    log_debug("DefaultView created");
+using ConnType = ConnectionManager::ConnectionType;
+
+GimbalControlView::GimbalControlView() {
+    log_debug("GimbalControlView created");
 }
 
-void DefaultView::render() {
+void GimbalControlView::render() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -20,18 +22,21 @@ void DefaultView::render() {
                              ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_NoBringToFrontOnFocus;
     
-    ImGui::Begin("MainView", nullptr, flags);
+    ImGui::Begin("GimbalControlView", nullptr, flags);
     
     auto& conn = ConnectionManager::getInstance();
     ImVec2 avail = ImGui::GetContentRegionAvail();
     
     // Define layout proportions
-    float left_panel_width = 350.0f;  // Fixed width for connection panel
+    float left_panel_width = 350.0f;
     float right_width = avail.x - left_panel_width - 10.0f;
     
-    float top_height = 250.0f;  // Height for top row
-    float middle_height = 200.0f;  // Height for middle row
+    float top_height = 250.0f;
+    float middle_height = 200.0f;
     float bottom_height = avail.y - top_height - middle_height - 20.0f;
+    
+    // Move connection_type to function scope so it's accessible everywhere
+    static ConnType connection_type = ConnType::Serial;
     
     // ═══════════════════════════════════════
     // TOP LEFT:  Connection Panel
@@ -50,7 +55,7 @@ void DefaultView::render() {
         } else if (conn.isConnecting()) {
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Connecting...");
         } else if (conn.hasError()) {
-            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error");
+            ImGui:: TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error");
             ImGui::SameLine();
             ImGui::TextWrapped("%s", conn.getErrorMessage().c_str());
         } else {
@@ -59,20 +64,27 @@ void DefaultView::render() {
         
         ImGui::Spacing();
         
-        static int connection_type = 0;  // 0 = Serial, 1 = Network
+        // connection_type is now declared above, outside this scope
         
         bool is_connected_or_connecting = conn.isConnected() || conn.isConnecting();
         
         // Disable controls when connected
         ImGui::BeginDisabled(is_connected_or_connecting);
         {
-            ImGui::RadioButton("Serial", &connection_type, 0);
+            // Cast to int for ImGui radio buttons
+            int connection_type_int = static_cast<int>(connection_type);
+            
+            if (ImGui::RadioButton("Serial", &connection_type_int, static_cast<int>(ConnType:: Serial))) {
+                connection_type = ConnType::Serial;
+            }
             ImGui::SameLine();
-            ImGui::RadioButton("Network", &connection_type, 1);
+            if (ImGui::RadioButton("Network", &connection_type_int, static_cast<int>(ConnType::Network))) {
+                connection_type = ConnType::Network;
+            }
             
             ImGui::Spacing();
             
-            if (connection_type == 0) {
+            if (connection_type == ConnType::Serial) {
                 // Serial connection
                 static char port_buffer[128] = "/dev/ttyUSB0";
                 static const std::pair<const char*, int> baud_rate_options[] = {
@@ -92,7 +104,7 @@ void DefaultView::render() {
                 if (ImGui::BeginCombo("Baud Rate", baud_rate_options[baud_rate_index].first)) {
                     for (int n = 0; n < IM_ARRAYSIZE(baud_rate_options); n++) {
                         const bool is_selected = (baud_rate_index == n);
-                        if (ImGui::Selectable(baud_rate_options[n].first, is_selected)) {
+                        if (ImGui:: Selectable(baud_rate_options[n].first, is_selected)) {
                             baud_rate_index = n;
                         }
                         if (is_selected) ImGui::SetItemDefaultFocus();
@@ -115,34 +127,32 @@ void DefaultView::render() {
                     conn.connectSerial(port_buffer, baud_rate);
                 }
                 
-                // Pop green color if we pushed it
                 if (color_count > 0) {
                     ImGui::PopStyleColor(color_count);
                 }
                 
-            } else {
+            } else if (connection_type == ConnType::Network) {
                 // Network connection
                 static char ip_buffer[128] = "192.168.1.100";
                 static int port = 3883;
                 
-                ImGui::InputText("IP Address", ip_buffer, sizeof(ip_buffer));
+                ImGui:: InputText("IP Address", ip_buffer, sizeof(ip_buffer));
                 ImGui::InputInt("Port", &port);
                 
                 // Push green color if connected
                 int color_count = 0;
                 if (conn.isConnected()) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
+                    ImGui:: PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
                     color_count = 3;
                 }
                 
                 if (ImGui::Button("Connect Network", ImVec2(-1, 0))) {
-                    log_info("Connecting to network:  {}:{}", ip_buffer, port);
+                    log_info("Connecting to network:   {}:{}", ip_buffer, port);
                     conn.connectNetwork(ip_buffer, port);
                 }
                 
-                // Pop green color if we pushed it
                 if (color_count > 0) {
                     ImGui::PopStyleColor(color_count);
                 }
@@ -212,45 +222,112 @@ void DefaultView::render() {
     ImGui::EndChild();
     
     // ═══════════════════════════════════════
-    // MIDDLE LEFT: Axis Position Display
+    // MIDDLE LEFT:  Streaming Control Panel
     // ═══════════════════════════════════════
-    ImGui::BeginChild("AxisPanel", ImVec2(left_panel_width, middle_height), true);
+    ImGui::BeginChild("StreamingPanel", ImVec2(left_panel_width, middle_height), true);
     {
-        ImGui::SeparatorText("Axis Positions");
+        ImGui::SeparatorText("Streaming");
         
-        ImGui::BeginDisabled(!conn.isConnected());
+        // Track streaming state and previous connection state
+        static bool is_streaming = false;
+        static bool was_connected = false;
+        static ConnType last_connection_type = ConnType::Serial;
+        
+        // Detect connection state changes
+        bool currently_connected = conn.isConnected();
+        
+        // When connection state changes from disconnected to connected
+        if (currently_connected && ! was_connected) {
+            // Set streaming based on connection type
+            if (connection_type == ConnType::Serial) {
+                is_streaming = true;
+                log_info("Serial connected - streaming enabled by default");
+            } else if (connection_type == ConnType::Network) {
+                is_streaming = false;
+                log_info("Network connected - streaming disabled by default");
+            }
+            last_connection_type = connection_type;
+        }
+        
+        // When disconnected, reset streaming state
+        if (!currently_connected && was_connected) {
+            is_streaming = false;
+            log_info("Disconnected - streaming reset");
+        }
+        
+        was_connected = currently_connected;
+        
+        // Display streaming status
+        ImGui::Text("Status:");
+        ImGui::SameLine();
+        
+        if (! conn.isConnected()) {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "N/A");
+        } else if (is_streaming) {
+            ImGui:: TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Streaming");
+        } else {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Not Streaming");
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        
+        ImGui::BeginDisabled(! conn.isConnected());
         {
-            static float pan_angle = 0.0f;
-            static float tilt_angle = 0.0f;
+            // Stream rate options
+            static const std::pair<const char*, int> stream_rate_options[] = {
+                {"5 Hz", 5},
+                {"10 Hz", 10},
+                {"20 Hz", 20},
+                {"30 Hz", 30},
+                {"40 Hz", 40},
+                {"50 Hz", 50}
+            };
+            static int stream_rate_index = 2;  // Default to 20 Hz
             
-            // Display current positions
-            ImGui::Text("Pan:   %.2f°", pan_angle);
-            ImGui::ProgressBar((pan_angle + 180.0f) / 360.0f, ImVec2(-1, 0));
+            ImGui::Text("Stream Rate:");
             
-            ImGui::Spacing();
-            
-            ImGui::Text("Tilt: %.2f°", tilt_angle);
-            ImGui::ProgressBar((tilt_angle + 90.0f) / 180.0f, ImVec2(-1, 0));
+            if (ImGui::BeginCombo("##StreamRate", stream_rate_options[stream_rate_index].first)) {
+                for (int n = 0; n < IM_ARRAYSIZE(stream_rate_options); n++) {
+                    const bool is_selected = (stream_rate_index == n);
+                    if (ImGui::Selectable(stream_rate_options[n]. first, is_selected)) {
+                        stream_rate_index = n;
+                        if (is_streaming) {
+                            int rate = stream_rate_options[stream_rate_index].second;
+                            log_info("Stream rate changed to {} Hz", rate);
+                            // TODO: Send stream rate change command to device
+                        }
+                    }
+                    if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
             
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
             
-            // Start/Stop streaming
-            static bool streaming = false;
-            if (streaming) {
-                if (ImGui::Button("Stop Streaming", ImVec2(-1, 0))) {
-                    streaming = false;
-                    log_info("Stopped axis streaming");
-                }
-                
-                // TODO: Update pan_angle and tilt_angle from device
-            } else {
-                if (ImGui::Button("Start Streaming", ImVec2(-1, 0))) {
-                    streaming = true;
-                    log_info("Started axis streaming");
+            // Start streaming button
+            if (ImGui::Button("Start Streaming", ImVec2(-1, 0))) {
+                if (! is_streaming) {
+                    is_streaming = true;
+                    int rate = stream_rate_options[stream_rate_index].second;
+                    log_info("Started streaming at {} Hz", rate);
+                    // TODO: Send start streaming command to device
                 }
             }
+            
+            // Stop streaming button (disabled when not streaming)
+            ImGui::BeginDisabled(! is_streaming);
+            {
+                if (ImGui::Button("Stop Streaming", ImVec2(-1, 0))) {
+                    is_streaming = false;
+                    log_info("Stopped streaming");
+                    // TODO: Send stop streaming command to device
+                }
+            }
+            ImGui::EndDisabled();
         }
         ImGui::EndDisabled();
     }
@@ -259,7 +336,7 @@ void DefaultView::render() {
     ImGui::SameLine();
     
     // ═══════════════════════════════════════
-    // MIDDLE RIGHT: Manual Control
+    // MIDDLE RIGHT:  Manual Control
     // ═══════════════════════════════════════
     ImGui::BeginChild("ControlPanel", ImVec2(right_width, middle_height), true);
     {
@@ -271,7 +348,7 @@ void DefaultView::render() {
             static float target_tilt = 0.0f;
             
             ImGui::SliderFloat("Target Pan", &target_pan, -180.0f, 180.0f, "%.1f°");
-            ImGui::SliderFloat("Target Tilt", &target_tilt, -90.0f, 90.0f, "%.1f°");
+            ImGui::SliderFloat("Target Tilt", &target_tilt, -90.0f, 90.0f, "%. 1f°");
             
             ImGui::Spacing();
             
@@ -294,18 +371,18 @@ void DefaultView::render() {
     ImGui::EndChild();
     
     // ═══════════════════════════════════════
-    // BOTTOM:  Diagnostics (Full Width)
+    // BOTTOM:   Diagnostics (Full Width)
     // ═══════════════════════════════════════
-    ImGui::BeginChild("DiagnosticsPanel", ImVec2(avail.x, bottom_height), true);
+    ImGui::BeginChild("DiagnosticsPanel", ImVec2(avail. x, bottom_height), true);
     {
         ImGui::SeparatorText("Diagnostics");
         
         ImGui::BeginDisabled(!conn.isConnected());
         {
-            ImGui::Text("Device Temperature: 45.2°C");
+            ImGui::Text("Device Temperature:   45.2°C");
             ImGui::Text("Motor Current (Pan): 0.32A");
             ImGui::Text("Motor Current (Tilt): 0.28A");
-            ImGui::Text("IMU Status: OK");
+            ImGui:: Text("IMU Status:  OK");
             ImGui::Text("Encoder Status: OK");
             
             ImGui::Spacing();
@@ -330,7 +407,7 @@ void DefaultView::render() {
         ImGui::Separator();
         
         // Footer
-        ImGui::Text("Application: %.3f ms/frame (%.1f FPS)", 
+        ImGui::Text("Application:   %. 3f ms/frame (%.1f FPS)", 
                     1000.0f / ImGui::GetIO().Framerate, 
                     ImGui::GetIO().Framerate);
     }

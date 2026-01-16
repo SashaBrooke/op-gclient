@@ -2,70 +2,73 @@
 #define EVENTS_HPP
 
 #include <string>
-#include <memory>
 #include <functional>
-#include <queue>
+#include <unordered_map>
 #include <vector>
-#include <set>
+#include <memory>
+#include <queue>
 #include <mutex>
-#include <chrono>
 
-/**
- * Base Event class
- */
+// Forward declaration
+namespace Rendering {
+    class View;
+}
+
+namespace Events {
+
 class Event {
-protected:
-    std::string name_;
-    std::chrono::system_clock::time_point time_;
-    
-public:
-    explicit Event(std::string name) 
-        : name_(std::move(name))
-        , time_(std::chrono::system_clock::now()) {}
-    
+public:  
+    explicit Event(std::string type) : type_(std::move(type)) {}
     virtual ~Event() = default;
     
-    const std::string& getName() const { return name_; }
-    const std::chrono::system_clock::time_point& getTime() const { return time_; }
+    const std::string& getType() const { return type_; }
+    
+private: 
+    std::string type_;
 };
 
-typedef std::shared_ptr<Event> Event_ptr;
+class SetViewEvent :  public Event {
+public:
+    explicit SetViewEvent(std::shared_ptr<Rendering::View> view) 
+        : Event("views/set_view")
+        , view_(std::move(view)) {}
+    
+    std::shared_ptr<Rendering::View> getView() const { return view_; }
 
-/**
- * Listener struct
- */
-struct Listener {
-    std::string filter;  // Event name pattern (supports wildcard *)
-    std::function<void(Event_ptr&)> callback;
-};
-
-/**
- * Thread-safe event queue singleton
- */
-class EventQueue {
 private:
-    std::queue<Event_ptr> event_queue_;
-    std::set<Listener*> listeners_;
-    std::recursive_mutex event_mutex_;
-    std::recursive_mutex listeners_mutex_;
-    
-    EventQueue() = default;
-    
-    bool isListener(const std::string& filter, const std::string& event_name);
-    
+    std::shared_ptr<Rendering::View> view_;
+};
+
+using EventCallback = std::function<void(const Event&)>;
+using Event_ptr = std::unique_ptr<Event>;
+
+class EventQueue {
 public:
     static EventQueue& getInstance() {
         static EventQueue instance;
         return instance;
     }
     
-    EventQueue(const EventQueue&) = delete;
-    void operator=(const EventQueue&) = delete;
+    // Subscribe to an event type
+    void subscribe(const std::string& event_type, EventCallback callback);
     
-    void subscribe(Listener* listener);
-    void unsubscribe(Listener* listener);
+    // Post an event to the queue (deferred execution)
     void post(Event_ptr event);
+    
+    // Process all queued events (call once per frame)
     void pollEvents();
+    
+private:
+    EventQueue() = default;
+    ~EventQueue() = default;
+    EventQueue(const EventQueue&) = delete;
+    EventQueue& operator=(const EventQueue&) = delete;
+    
+    std::unordered_map<std::string, std::vector<EventCallback>> subscribers_;
+    std::queue<Event_ptr> event_queue_;
+    std::mutex queue_mutex_;
 };
+
+} // namespace Events
 
 #endif // EVENTS_HPP

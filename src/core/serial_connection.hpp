@@ -78,7 +78,7 @@ private:
     int baud_rate_;
     
     // TODO: Add actual serial implementation
-    // - boost::asio:: serial_port
+    // - boost::asio::serial_port
     // - or platform-specific file descriptor (Linux)
     // - or HANDLE (Windows)
 };

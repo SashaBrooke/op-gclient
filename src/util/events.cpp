@@ -1,51 +1,50 @@
-#include "events.hpp"
-#include <algorithm>
+#include "util/events.hpp"
+#include "util/logging.hpp"
 
-void EventQueue::subscribe(Listener* listener) {
-    std::lock_guard<std::recursive_mutex> guard(listeners_mutex_);
-    if (listeners_.find(listener) == listeners_.end()) {
-        listeners_.insert(listener);
-    }
-}
+namespace Events {
 
-void EventQueue::unsubscribe(Listener* listener) {
-    std::lock_guard<std::recursive_mutex> guard(listeners_mutex_);
-    listeners_.erase(listener);
+void EventQueue::subscribe(const std::string& event_type, EventCallback callback) {
+    subscribers_[event_type].push_back(std::move(callback));
+    log_debug("Subscribed to event: {}", event_type);
 }
 
 void EventQueue::post(Event_ptr event) {
-    std::lock_guard<std::recursive_mutex> guard(event_mutex_);
-    event_queue_.push(event);
+    if (!event) {
+        log_warn("Attempted to post null event");
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    log_debug("Posted event to queue:  {}", event->getType());
+    event_queue_.push(std::move(event));
 }
 
 void EventQueue::pollEvents() {
-    std::lock_guard<std::recursive_mutex> event_guard(event_mutex_);
+    std::queue<Event_ptr> events_to_process;
     
-    while (!event_queue_.empty()) {
-        Event_ptr event = event_queue_.front();
+    // Move all events from queue to local queue
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        events_to_process. swap(event_queue_);
+    }
+    
+    // Process all events
+    while (!events_to_process.empty()) {
+        auto& event = events_to_process.front();
+        const auto& event_type = event->getType();
         
-        std::lock_guard<std::recursive_mutex> listener_guard(listeners_mutex_);
-        for (const auto& listener : listeners_) {
-            if (isListener(listener->filter, event->getName())) {
-                listener->callback(event);
+        auto it = subscribers_.find(event_type);
+        if (it != subscribers_.end()) {
+            log_debug("Processing event: {}", event_type);
+            for (const auto& callback : it->second) {
+                callback(*event);
             }
+        } else {
+            log_debug("No subscribers for event: {}", event_type);
         }
         
-        event_queue_.pop();
+        events_to_process.pop();
     }
 }
 
-bool EventQueue::isListener(const std::string& filter, const std::string& event_name) {
-    // Simple wildcard matching:  "views*" matches "views/set_view"
-    if (filter.empty()) return false;
-    
-    // Check for wildcard at end
-    size_t wildcard_pos = filter.find('*');
-    if (wildcard_pos != std::string::npos) {
-        // Match everything before the wildcard
-        return event_name.compare(0, wildcard_pos, filter, 0, wildcard_pos) == 0;
-    }
-    
-    // Exact match
-    return filter == event_name;
-}
+} // namespace Events

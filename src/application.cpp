@@ -1,9 +1,9 @@
 #include "application.hpp"
-#include "rendering/views/default_view.hpp"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "util/window_handler.hpp"
 #include "util/logging.hpp"
+#include "util/events.hpp"
 #include <stdexcept>
 #include <iostream>
 
@@ -19,7 +19,6 @@ Application::Application(std::string window_title, int width, int height)
 }
 
 Application::~Application() {
-    EventQueue::getInstance().unsubscribe(&view_change_listener_);
     g_app_instance = nullptr;
     shutdown();
 }
@@ -74,13 +73,13 @@ void Application::initImGui() {
     ImGuiIO& io = ImGui::GetIO();
     
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io. ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     log_debug("ImGui docking and viewports enabled");
 
     // Handle high DPI displays
     float xscale, yscale;
     glfwGetWindowContentScale(window_, &xscale, &yscale);
-    log_info("Display scale: {}x, {}y", xscale, yscale);
+    log_info("Display scale:  {}x, {}y", xscale, yscale);
     
     ImGui::StyleColorsDark();
     
@@ -105,7 +104,7 @@ void Application::initImGui() {
         float scale = std::max(xscale, yscale);
         
         ImFontConfig font_config;
-        font_config.SizePixels = 13.0f * scale;  // Default size * DPI scale
+        font_config.SizePixels = 13.0f * scale;
         font_config.OversampleH = 2;
         font_config.OversampleV = 2;
         
@@ -113,10 +112,9 @@ void Application::initImGui() {
         io.Fonts->AddFontDefault(&font_config);
         io.Fonts->Build();
         
-        // Update texture
         unsigned char* pixels;
         int width, height;
-        io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+        io. Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
         
         log_debug("Loaded high-DPI font at {}px", font_config.SizePixels);
     }
@@ -130,20 +128,9 @@ void Application::init() {
     initGL3W();
     initImGui();
     
-    // Setup view change listener
-    view_change_listener_.filter = "views/set_view";
-    view_change_listener_.callback = [this](Event_ptr& event) {
-        auto view_event = dynamic_cast<Rendering::SetViewEvent*>(event.get());
-        if (view_event) {
-            log_info("View change event received");
-            setView(view_event->getView());
-        }
-    };
-    EventQueue::getInstance().subscribe(&view_change_listener_);
-    log_debug("View change listener subscribed");
+    // Create ViewManager - it handles all view changes via events
+    view_manager_ = std::make_unique<Rendering::ViewManager>();
     
-    // Set initial view
-    current_view_ = std::make_shared<Rendering::DefaultView>();
     log_info("Application initialized successfully");
 }
 
@@ -153,14 +140,17 @@ void Application::loop() {
     
     while (!glfwWindowShouldClose(window_)) {
         glfwPollEvents();
-        EventQueue::getInstance().pollEvents();
+        
+        // Process queued events BEFORE rendering
+        Events::EventQueue::getInstance().pollEvents();
         
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
-        if (current_view_) {
-            current_view_->render();
+        // ViewManager renders the current view
+        if (view_manager_) {
+            view_manager_->render();
         }
         
         ImGui::Render();
@@ -187,12 +177,9 @@ void Application::loop() {
     log_info("Main loop exited");
 }
 
-void Application::setView(std::shared_ptr<Rendering::View> view) {
-    log_debug("Setting new view");
-    current_view_ = view;
-}
-
 void Application::shutdown() {
+    view_manager_.reset();
+    
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

@@ -24,14 +24,7 @@ PC application used to control the OhPossum system.
 git submodule update --init --recursive
 ```
 
-2. Generate gl3w loader (one-time setup):
-```bash
-cd ext/gl3w
-python3 gl3w_gen.py
-cd ../..
-```
-
-3. Build the project:
+2. Build the project:
 ```bash
 mkdir build
 cd build
@@ -39,7 +32,7 @@ cmake ..
 cmake --build . 
 ```
 
-4. Run the application:
+3. Run the application:
 ```bash
 ./op-gclient
 ```
@@ -47,13 +40,15 @@ cmake --build .
 ## Project Structure
 
 ```
-src/
-├── main.cpp                      # Application entry point
-├── application.hpp/cpp           # Main application class
-├── rendering/
-│   ├── views.hpp/cpp             # Base view class
-│   └── views/
-│       └── xxx_view.hpp/cpp      # Place view implementations here
-└── util/
-    └── xxx_util.hpp/cpp          # Place utilities here
+op-gclient/
+├── src/
+│   ├── main.cpp                # Application entry point
+│   ├── application.hpp/cpp     # Main application class
+│   ├── core/                   # Core business logic modules
+│   ├── rendering/              # Everything related to what is rendered to the screen
+│   │   └── views/              # Different application views (place view implementations here)
+│   └── util/                   # Utilities to make the application structure function (not business logic)
+│
+├── ext/                        # External dependencies
+└── docs/                       # Documentation
 ```

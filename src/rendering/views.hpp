@@ -2,34 +2,28 @@
 #define VIEWS_HPP
 
 #include <memory>
-#include "util/events.hpp"
 
 namespace Rendering {
-    /**
-     * Base class for all views
-     */
-    class View {
-    public:
-        View() = default;
-        virtual ~View() = default;
-        
-        virtual void render() = 0;
-    };
+
+// Forward declaration
+class View;
+
+class View {
+public: 
+    virtual ~View() = default;
+    virtual void render() = 0;
+};
+
+class ViewManager {
+public:
+    ViewManager();
+    void render();
+    void setView(std::shared_ptr<View> view);
     
-    /**
-     * Event for switching views
-     */
-    class SetViewEvent : public Event {
-    private:
-        std::shared_ptr<View> view_;
-        
-    public:
-        explicit SetViewEvent(std::shared_ptr<View> view) 
-            : Event("views/set_view")
-            , view_(std::move(view)) {}
-        
-        std::shared_ptr<View> getView() { return view_; }
-    };
-}
+private:
+    std::shared_ptr<View> current_view_;
+};
+
+} // namespace Rendering
 
 #endif // VIEWS_HPP
