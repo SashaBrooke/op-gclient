@@ -55,7 +55,7 @@ void GimbalControlView::render() {
         } else if (conn.isConnecting()) {
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Connecting...");
         } else if (conn.hasError()) {
-            ImGui:: TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error");
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error");
             ImGui::SameLine();
             ImGui::TextWrapped("%s", conn.getErrorMessage().c_str());
         } else {
@@ -74,7 +74,7 @@ void GimbalControlView::render() {
             // Cast to int for ImGui radio buttons
             int connection_type_int = static_cast<int>(connection_type);
             
-            if (ImGui::RadioButton("Serial", &connection_type_int, static_cast<int>(ConnType:: Serial))) {
+            if (ImGui::RadioButton("Serial", &connection_type_int, static_cast<int>(ConnType::Serial))) {
                 connection_type = ConnType::Serial;
             }
             ImGui::SameLine();
@@ -104,7 +104,7 @@ void GimbalControlView::render() {
                 if (ImGui::BeginCombo("Baud Rate", baud_rate_options[baud_rate_index].first)) {
                     for (int n = 0; n < IM_ARRAYSIZE(baud_rate_options); n++) {
                         const bool is_selected = (baud_rate_index == n);
-                        if (ImGui:: Selectable(baud_rate_options[n].first, is_selected)) {
+                        if (ImGui::Selectable(baud_rate_options[n].first, is_selected)) {
                             baud_rate_index = n;
                         }
                         if (is_selected) ImGui::SetItemDefaultFocus();
@@ -136,13 +136,13 @@ void GimbalControlView::render() {
                 static char ip_buffer[128] = "192.168.1.100";
                 static int port = 3883;
                 
-                ImGui:: InputText("IP Address", ip_buffer, sizeof(ip_buffer));
+                ImGui::InputText("IP Address", ip_buffer, sizeof(ip_buffer));
                 ImGui::InputInt("Port", &port);
                 
                 // Push green color if connected
                 int color_count = 0;
                 if (conn.isConnected()) {
-                    ImGui:: PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
                     color_count = 3;
@@ -264,7 +264,7 @@ void GimbalControlView::render() {
         if (! conn.isConnected()) {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "N/A");
         } else if (is_streaming) {
-            ImGui:: TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Streaming");
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Streaming");
         } else {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Not Streaming");
         }
@@ -291,7 +291,7 @@ void GimbalControlView::render() {
             if (ImGui::BeginCombo("##StreamRate", stream_rate_options[stream_rate_index].first)) {
                 for (int n = 0; n < IM_ARRAYSIZE(stream_rate_options); n++) {
                     const bool is_selected = (stream_rate_index == n);
-                    if (ImGui::Selectable(stream_rate_options[n]. first, is_selected)) {
+                    if (ImGui::Selectable(stream_rate_options[n].first, is_selected)) {
                         stream_rate_index = n;
                         if (is_streaming) {
                             int rate = stream_rate_options[stream_rate_index].second;
@@ -348,7 +348,7 @@ void GimbalControlView::render() {
             static float target_tilt = 0.0f;
             
             ImGui::SliderFloat("Target Pan", &target_pan, -180.0f, 180.0f, "%.1f°");
-            ImGui::SliderFloat("Target Tilt", &target_tilt, -90.0f, 90.0f, "%. 1f°");
+            ImGui::SliderFloat("Target Tilt", &target_tilt, -90.0f, 90.0f, "%.1f°");
             
             ImGui::Spacing();
             
@@ -373,7 +373,7 @@ void GimbalControlView::render() {
     // ═══════════════════════════════════════
     // BOTTOM:   Diagnostics (Full Width)
     // ═══════════════════════════════════════
-    ImGui::BeginChild("DiagnosticsPanel", ImVec2(avail. x, bottom_height), true);
+    ImGui::BeginChild("DiagnosticsPanel", ImVec2(avail.x, bottom_height), true);
     {
         ImGui::SeparatorText("Diagnostics");
         
@@ -382,7 +382,7 @@ void GimbalControlView::render() {
             ImGui::Text("Device Temperature:   45.2°C");
             ImGui::Text("Motor Current (Pan): 0.32A");
             ImGui::Text("Motor Current (Tilt): 0.28A");
-            ImGui:: Text("IMU Status:  OK");
+            ImGui::Text("IMU Status:  OK");
             ImGui::Text("Encoder Status: OK");
             
             ImGui::Spacing();
@@ -407,7 +407,7 @@ void GimbalControlView::render() {
         ImGui::Separator();
         
         // Footer
-        ImGui::Text("Application:   %. 3f ms/frame (%.1f FPS)", 
+        ImGui::Text("Application: %.3f ms/frame (%.1f FPS)", 
                     1000.0f / ImGui::GetIO().Framerate, 
                     ImGui::GetIO().Framerate);
     }

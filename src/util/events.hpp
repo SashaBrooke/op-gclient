@@ -52,6 +52,12 @@ public:
     // Subscribe to an event type
     void subscribe(const std::string& event_type, EventCallback callback);
     
+    // Unsubscribe all callbacks for an event type
+    void unsubscribe(const std::string& event_type);
+    
+    // Clear all subscribers and queued events
+    void clearAll();
+    
     // Post an event to the queue (deferred execution)
     void post(Event_ptr event);
     

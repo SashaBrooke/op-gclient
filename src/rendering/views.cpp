@@ -22,6 +22,12 @@ ViewManager::ViewManager() {
     log_debug("View change listener subscribed");
 }
 
+ViewManager::~ViewManager() {
+    log_debug("ViewManager destructor - unsubscribing from events");
+    // Unsubscribe from events to prevent dangling references
+    Events::EventQueue::getInstance().unsubscribe("views/set_view");
+}
+
 void ViewManager::setView(std::shared_ptr<View> view) {
     log_info("Changing view");
     current_view_ = std::move(view);

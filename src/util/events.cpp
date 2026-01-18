@@ -8,6 +8,22 @@ void EventQueue::subscribe(const std::string& event_type, EventCallback callback
     log_debug("Subscribed to event: {}", event_type);
 }
 
+void EventQueue::unsubscribe(const std::string& event_type) {
+    auto it = subscribers_.find(event_type);
+    if (it != subscribers_.end()) {
+        subscribers_.erase(it);
+        log_debug("Unsubscribed from event: {}", event_type);
+    }
+}
+
+void EventQueue::clearAll() {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    subscribers_.clear();
+    std::queue<Event_ptr> empty;
+    event_queue_.swap(empty);
+    log_debug("Cleared all event subscriptions and queued events");
+}
+
 void EventQueue::post(Event_ptr event) {
     if (!event) {
         log_warn("Attempted to post null event");
@@ -25,7 +41,7 @@ void EventQueue::pollEvents() {
     // Move all events from queue to local queue
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
-        events_to_process. swap(event_queue_);
+        events_to_process.swap(event_queue_);
     }
     
     // Process all events

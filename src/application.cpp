@@ -73,7 +73,7 @@ void Application::initImGui() {
     ImGuiIO& io = ImGui::GetIO();
     
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io. ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     log_debug("ImGui docking and viewports enabled");
 
     // Handle high DPI displays
@@ -114,7 +114,7 @@ void Application::initImGui() {
         
         unsigned char* pixels;
         int width, height;
-        io. Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+        io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
         
         log_debug("Loaded high-DPI font at {}px", font_config.SizePixels);
     }
@@ -178,7 +178,11 @@ void Application::loop() {
 }
 
 void Application::shutdown() {
+    // Clear view manager and its event subscriptions
     view_manager_.reset();
+    
+    // Clear all remaining event subscriptions to prevent static destruction issues
+    Events::EventQueue::getInstance().clearAll();
     
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();

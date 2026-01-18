@@ -17,6 +17,7 @@ public:
 class ViewManager {
 public:
     ViewManager();
+    ~ViewManager();
     void render();
     void setView(std::shared_ptr<View> view);
     
