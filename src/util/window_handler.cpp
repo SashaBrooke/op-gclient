@@ -45,7 +45,7 @@ void WindowHandler::removeWindow(GLFWwindow* window) {
 }
 
 void WindowHandler::renderAll() {
-    for (auto& [window, info] :  windows_) {
+    for (auto& [window, info] : windows_) {
         if (window == main_window_) {
             continue; // Main window is rendered by Application
         }

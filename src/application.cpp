@@ -1,9 +1,11 @@
 #include "application.hpp"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "implot.h"
 #include "util/window_handler.hpp"
 #include "util/logging.hpp"
 #include "util/events.hpp"
+#include "core/connection_manager.hpp"
 #include <stdexcept>
 #include <iostream>
 
@@ -16,6 +18,8 @@ Application::Application(std::string window_title, int width, int height)
     , window_height_(height)
 {
     g_app_instance = this;
+
+    log_info("=== Application Starting ===");
 }
 
 Application::~Application() {
@@ -70,6 +74,7 @@ void Application::initImGui() {
     log_info("Initializing ImGui");
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -178,18 +183,28 @@ void Application::loop() {
 }
 
 void Application::shutdown() {
+    // IMPORTANT: Disconnect any active connections FIRST
+    // This ensures serial/network cleanup happens before GLFW/ImGui shutdown
+    log_debug("Disconnecting any active connections");
+    ConnectionManager::getInstance().disconnect();
+
     // Clear view manager and its event subscriptions
+    log_debug("Shutting down ViewManager");
     view_manager_.reset();
     
     // Clear all remaining event subscriptions to prevent static destruction issues
+    log_debug("Clearing event queue");
     Events::EventQueue::getInstance().clearAll();
     
+    log_debug("Shutting down ImGui and GLFW");
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
+    ImPlot::DestroyContext();
     ImGui::DestroyContext();
     
     if (window_) {
         glfwDestroyWindow(window_);
     }
     glfwTerminate();
+    log_info("=== Application Shutting Down ===");
 }

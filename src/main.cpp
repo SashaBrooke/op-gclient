@@ -7,7 +7,6 @@ int main(int, char**)
 {
     try {
         initialize_logging();
-        log_info("=== Application Starting ===");
 
         // For safety, scope application so app is shutdown before logging is terminated
         {
@@ -16,7 +15,6 @@ int main(int, char**)
             app.loop();
         }
 
-        log_info("=== Application Shutting Down ===");
         shutdown_logging();
         
         return 0;

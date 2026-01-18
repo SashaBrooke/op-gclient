@@ -31,6 +31,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/ext/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/ext/imgui/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/ext/implot
     ${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/include
     ${CMAKE_CURRENT_SOURCE_DIR}/ext/gl3w/include
 )
@@ -38,6 +39,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
     imgui
+    implot
     glfw
     gl3w
     spdlog::spdlog
