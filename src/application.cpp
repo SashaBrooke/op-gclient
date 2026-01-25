@@ -9,21 +9,16 @@
 #include <stdexcept>
 #include <iostream>
 
-Application* g_app_instance = nullptr;
-
 Application::Application(std::string window_title, int width, int height)
     : window_(nullptr)
     , window_title_(window_title)
     , window_width_(width)
     , window_height_(height)
 {
-    g_app_instance = this;
-
     log_info("=== Application Starting ===");
 }
 
 Application::~Application() {
-    g_app_instance = nullptr;
     shutdown();
 }
 
@@ -183,6 +178,8 @@ void Application::loop() {
 }
 
 void Application::shutdown() {
+    log_debug("Application:: shutdown() called");
+
     // IMPORTANT: Disconnect any active connections FIRST
     // This ensures serial/network cleanup happens before GLFW/ImGui shutdown
     log_debug("Disconnecting any active connections");
@@ -206,5 +203,6 @@ void Application::shutdown() {
         glfwDestroyWindow(window_);
     }
     glfwTerminate();
+
     log_info("=== Application Shutting Down ===");
 }

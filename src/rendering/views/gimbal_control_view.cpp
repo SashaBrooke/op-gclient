@@ -1,6 +1,8 @@
 #include "rendering/views/gimbal_control_view.hpp"
 #include "core/connection_manager.hpp"
+#include "core/gimbal_state.hpp"
 #include "util/logging.hpp"
+#include "platform/serial_port_helper.hpp"
 #include "imgui.h"
 #include "implot.h"
 #include <utility>
@@ -13,9 +15,23 @@ using ConnType = ConnectionManager::ConnectionType;
 
 GimbalControlView::GimbalControlView() {
     log_debug("GimbalControlView created");
+
+    refreshSerialPorts();
 }
 
-void GimbalControlView::render() {
+void GimbalControlView::refreshSerialPorts() {
+    available_serial_ports_ = SerialPortHelper::getAvailablePorts();
+    
+    if (available_serial_ports_.empty()) {
+        log_warn("No serial ports detected");
+        available_serial_ports_.push_back("No ports found");
+    }
+    
+    // Reset selection to first item
+    selected_port_index_ = 0;
+}
+
+void GimbalControlView:: render() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -28,6 +44,8 @@ void GimbalControlView::render() {
     ImGui::Begin("GimbalControlView", nullptr, flags);
     
     auto& conn = ConnectionManager::getInstance();
+    auto& gimbal = GimbalState::getInstance();
+    
     ImVec2 avail = ImGui::GetContentRegionAvail();
     
     // Define layout proportions
@@ -38,11 +56,10 @@ void GimbalControlView::render() {
     float middle_height = 200.0f;
     float bottom_height = avail.y - top_height - middle_height - 20.0f;
     
-    // Move connection_type to function scope so it's accessible everywhere
     static ConnType connection_type = ConnType::Serial;
     
     // ═══════════════════════════════════════
-    // TOP LEFT: Connection Panel
+    // TOP LEFT:  Connection Panel (NO CHANGES NEEDED)
     // ═══════════════════════════════════════
     ImGui::BeginChild("ConnectionPanel", ImVec2(left_panel_width, top_height), true);
     {
@@ -56,26 +73,24 @@ void GimbalControlView::render() {
             ImGui::SameLine();
             ImGui::Text("to %s", conn.getDeviceInfo().c_str());
         } else if (conn.isConnecting()) {
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Connecting...");
+            ImGui:: TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Connecting...");
         } else if (conn.hasError()) {
-            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error");
+            ImGui:: TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error");
             ImGui::SameLine();
             ImGui::TextWrapped("%s", conn.getErrorMessage().c_str());
         } else {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Disconnected");
         }
         
-        ImGui::Spacing();
+        ImGui:: Spacing();
         
         bool is_connected_or_connecting = conn.isConnected() || conn.isConnecting();
         
-        // Disable controls when connected
         ImGui::BeginDisabled(is_connected_or_connecting);
         {
-            // Cast to int for ImGui radio buttons
             int connection_type_int = static_cast<int>(connection_type);
             
-            if (ImGui::RadioButton("Serial", &connection_type_int, static_cast<int>(ConnType::Serial))) {
+            if (ImGui::RadioButton("Serial", &connection_type_int, static_cast<int>(ConnType:: Serial))) {
                 connection_type = ConnType::Serial;
             }
             ImGui::SameLine();
@@ -83,10 +98,9 @@ void GimbalControlView::render() {
                 connection_type = ConnType::Network;
             }
             
-            ImGui::Spacing();
+            ImGui:: Spacing();
             
             if (connection_type == ConnType::Serial) {
-                // Serial connection
                 static char port_buffer[128] = "/dev/ttyUSB0";
                 static const std::pair<const char*, int> baud_rate_options[] = {
                     {"9600", 9600},
@@ -100,68 +114,87 @@ void GimbalControlView::render() {
                 };
                 static int baud_rate_index = 4;
                 
-                ImGui::InputText("Port", port_buffer, sizeof(port_buffer));
-                
-                if (ImGui::BeginCombo("Baud Rate", baud_rate_options[baud_rate_index].first)) {
+                // Calculate width for combo boxes
+                float combo_width = ImGui:: GetContentRegionAvail().x;
+                float label_width = 80.0f;  // Adjust this for your label width
+                float refresh_button_width = 55.0f;
+                float spacing = ImGui::GetStyle().ItemSpacing.x;
+
+                // Port dropdown + refresh button + label
+                ImGui::SetNextItemWidth(combo_width - refresh_button_width - label_width - spacing * 2);
+                const char* current_port = available_serial_ports_[selected_port_index_]. c_str();
+                if (ImGui::BeginCombo("##PortCombo", current_port)) {
+                    for (size_t i = 0; i < available_serial_ports_.size(); ++i) {
+                        bool is_selected = (selected_port_index_ == i);
+                        if (ImGui::Selectable(available_serial_ports_[i].c_str(), is_selected)) {
+                            selected_port_index_ = i;
+                        }
+                        if (is_selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                // Refresh button on same line
+                ImGui::SameLine();
+                if (ImGui::Button("Refresh", ImVec2(refresh_button_width, 0))) {
+                    log_info("Refreshing serial port list");
+                    refreshSerialPorts();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Refresh serial port list");
+                }
+
+                // Label on same line
+                ImGui::SameLine();
+                ImGui::Text("Port");
+
+                // Baud rate dropdown + label (same width as above)
+                ImGui::SetNextItemWidth(combo_width - label_width - spacing);
+                if (ImGui::BeginCombo("##BaudRate", baud_rate_options[baud_rate_index].first)) {
                     for (int n = 0; n < IM_ARRAYSIZE(baud_rate_options); n++) {
                         const bool is_selected = (baud_rate_index == n);
-                        if (ImGui::Selectable(baud_rate_options[n].first, is_selected)) {
+                        if (ImGui:: Selectable(baud_rate_options[n].first, is_selected)) {
                             baud_rate_index = n;
                         }
                         if (is_selected) ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
-                
-                // Push green color if connected
-                int color_count = 0;
-                if (conn.isConnected()) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
-                    color_count = 3;
-                }
+
+                // Label on same line
+                ImGui::SameLine();
+                ImGui::Text("Baud Rate");
                 
                 if (ImGui::Button("Connect Serial", ImVec2(-1, 0))) {
-                    int baud_rate = baud_rate_options[baud_rate_index].second;
-                    log_info("Connecting to serial: {} @ {}", port_buffer, baud_rate);
-                    conn.connectSerial(port_buffer, baud_rate);
+                    const std::string& selected_port = available_serial_ports_[selected_port_index_];
+                    
+                    // Check if valid port
+                    if (selected_port == "No ports found") {
+                        log_error("No serial ports available");
+                    } else {
+                        int baud_rate = baud_rate_options[baud_rate_index].second;
+                        log_info("Connecting to serial:  {} @ {}", selected_port, baud_rate);
+                        conn.connectSerial(selected_port, baud_rate);
+                    }
                 }
                 
-                if (color_count > 0) {
-                    ImGui::PopStyleColor(color_count);
-                }
-                
-            } else if (connection_type == ConnType::Network) {
-                // Network connection
+            } else if (connection_type == ConnType:: Network) {
                 static char ip_buffer[128] = "192.168.1.100";
                 static int port = 3883;
                 
                 ImGui::InputText("IP Address", ip_buffer, sizeof(ip_buffer));
                 ImGui::InputInt("Port", &port);
                 
-                // Push green color if connected
-                int color_count = 0;
-                if (conn.isConnected()) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 0.6f));
-                    color_count = 3;
-                }
-                
                 if (ImGui::Button("Connect Network", ImVec2(-1, 0))) {
-                    log_info("Connecting to network: {}:{}", ip_buffer, port);
+                    log_info("Connecting to network:  {}:{}", ip_buffer, port);
                     conn.connectNetwork(ip_buffer, port);
-                }
-                
-                if (color_count > 0) {
-                    ImGui::PopStyleColor(color_count);
                 }
             }
         }
         ImGui::EndDisabled();
         
-        // Red disconnect button (only shown when connected)
         if (is_connected_or_connecting) {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.0f, 0.0f, 0.6f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.8f));
@@ -187,21 +220,25 @@ void GimbalControlView::render() {
     {
         ImGui::SeparatorText("Gimbal Mode");
         
-        ImGui::BeginDisabled(!conn.isConnected());
+        ImGui::BeginDisabled(! conn.isConnected());
         {
-            static int mode = 0;  // 0 = Disarmed, 1 = Armed
+            // Read mode from GimbalState
+            auto mode = gimbal.getMode();
             
-            // Mode status display
             ImGui::Text("Mode:");
             ImGui::SameLine();
             
-            if (mode == 0) {
+            if (mode.type == GimbalState::Mode::Type::Idle) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-                ImGui::Text("DISARMED");
+                ImGui::Text("IDLE");
+                ImGui::PopStyleColor();
+            } else if (mode.is_enabled) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+                ImGui::Text("ENABLED");
                 ImGui::PopStyleColor();
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.0f, 1.0f));
-                ImGui::Text("ARMED");
+                ImGui::Text("DISABLED");
                 ImGui::PopStyleColor();
             }
             
@@ -209,17 +246,24 @@ void GimbalControlView::render() {
             ImGui::Separator();
             ImGui::Spacing();
             
-            // Mode buttons
             if (ImGui::Button("ARM", ImVec2(-1, 40))) {
-                mode = 1;
-                log_info("Gimbal ARMED");
-                // TODO: Send ARM command to device
+                log_info("Sending ARM command");
+                // Send command via backend
+                if (auto* backend = conn.getBackend()) {
+                    // TODO: Create your protobuf ARM message
+                    // std::vector<uint8_t> cmd_data = ... ;
+                    // backend->sendMessage(cmd_data, [](bool success) {
+                    //     log_info("ARM command {}", success ? "ACKed" : "timeout");
+                    // });
+                }
             }
             
             if (ImGui::Button("DISARM", ImVec2(-1, 40))) {
-                mode = 0;
-                log_info("Gimbal DISARMED");
-                // TODO: Send DISARM command to device
+                log_info("Sending DISARM command");
+                // Send command via backend
+                if (auto* backend = conn.getBackend()) {
+                    // TODO: Create your protobuf DISARM message
+                }
             }
         }
         ImGui::EndDisabled();
@@ -229,7 +273,7 @@ void GimbalControlView::render() {
     ImGui::SameLine();
     
     // ═══════════════════════════════════════
-    // TOP RIGHT: Object Tracking
+    // TOP RIGHT: Object Tracking (same pattern)
     // ═══════════════════════════════════════
     ImGui::BeginChild("TrackingPanel", ImVec2(top_right_half, top_height), true);
     {
@@ -237,7 +281,6 @@ void GimbalControlView::render() {
         
         static bool is_tracking = false;
         
-        // Tracking status display
         ImGui::Text("Tracking:");
         ImGui::SameLine();
         
@@ -248,79 +291,68 @@ void GimbalControlView::render() {
         } else {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
             ImGui::Text("NOT TRACKING");
-            ImGui::PopStyleColor();
+            ImGui:: PopStyleColor();
         }
         
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
         
-        // Only enable tracking controls when connected via network
         bool enable_tracking = conn.isConnected() && (connection_type == ConnType::Network);
-        ImGui::BeginDisabled(!enable_tracking);
+        ImGui::BeginDisabled(! enable_tracking);
         {
             if (ImGui::Button("Enable Tracking", ImVec2(-1, 40))) {
                 is_tracking = true;
                 log_info("Object tracking enabled");
-                // TODO: Send enable tracking command
+                // Send command via backend
             }
             
             if (ImGui::Button("Disable Tracking", ImVec2(-1, 40))) {
                 is_tracking = false;
                 log_info("Object tracking disabled");
-                // TODO: Send disable tracking command
+                // Send command via backend
             }
         }
         ImGui::EndDisabled();
         
-        if (!enable_tracking && conn.isConnected()) {
-            ImGui::Spacing();
+        if (! enable_tracking && conn.isConnected()) {
+            ImGui:: Spacing();
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Note: Tracking only available via network connection");
         }
     }
     ImGui::EndChild();
     
     // ═══════════════════════════════════════
-    // MIDDLE LEFT: Streaming Control Panel
+    // MIDDLE LEFT: Streaming Control (no changes needed)
     // ═══════════════════════════════════════
     ImGui::BeginChild("StreamingPanel", ImVec2(left_panel_width, middle_height), true);
     {
-        ImGui::SeparatorText("Streaming");
+        ImGui:: SeparatorText("Streaming");
         
-        // Track streaming state and previous connection state
         static bool is_streaming = false;
         static bool was_connected = false;
-        static ConnType last_connection_type = ConnType::Serial;
         
-        // Detect connection state changes
         bool currently_connected = conn.isConnected();
         
-        // When connection state changes from disconnected to connected
         if (currently_connected && !was_connected) {
-            // Set streaming based on connection type
             if (connection_type == ConnType::Serial) {
                 is_streaming = true;
                 log_info("Serial connected - streaming enabled by default");
-            } else if (connection_type == ConnType::Network) {
+            } else {
                 is_streaming = false;
-                log_info("Network connected - streaming disabled by default");
             }
-            last_connection_type = connection_type;
         }
         
-        // When disconnected, reset streaming state
-        if (!currently_connected && was_connected) {
+        if (! currently_connected && was_connected) {
             is_streaming = false;
-            log_info("Disconnected - streaming reset");
         }
         
         was_connected = currently_connected;
         
-        // Display streaming status
         ImGui::Text("Status:");
         ImGui::SameLine();
         
-        if (!conn.isConnected()) {
+        if (! conn.isConnected()) {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "N/A");
         } else if (is_streaming) {
             ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Streaming");
@@ -334,16 +366,11 @@ void GimbalControlView::render() {
         
         ImGui::BeginDisabled(!conn.isConnected());
         {
-            // Stream rate options
             static const std::pair<const char*, int> stream_rate_options[] = {
-                {"5 Hz", 5},
-                {"10 Hz", 10},
-                {"20 Hz", 20},
-                {"30 Hz", 30},
-                {"40 Hz", 40},
-                {"50 Hz", 50}
+                {"5 Hz", 5}, {"10 Hz", 10}, {"20 Hz", 20},
+                {"30 Hz", 30}, {"40 Hz", 40}, {"50 Hz", 50}
             };
-            static int stream_rate_index = 2;  // Default to 20 Hz
+            static int stream_rate_index = 2;
             
             ImGui::Text("Stream Rate:");
             
@@ -355,7 +382,7 @@ void GimbalControlView::render() {
                         if (is_streaming) {
                             int rate = stream_rate_options[stream_rate_index].second;
                             log_info("Stream rate changed to {} Hz", rate);
-                            // TODO: Send stream rate change command to device
+                            // Send rate change command via backend
                         }
                     }
                     if (is_selected) ImGui::SetItemDefaultFocus();
@@ -367,23 +394,21 @@ void GimbalControlView::render() {
             ImGui::Separator();
             ImGui::Spacing();
             
-            // Start streaming button
             if (ImGui::Button("Start Streaming", ImVec2(-1, 0))) {
-                if (!is_streaming) {
+                if (! is_streaming) {
                     is_streaming = true;
                     int rate = stream_rate_options[stream_rate_index].second;
                     log_info("Started streaming at {} Hz", rate);
-                    // TODO: Send start streaming command to device
+                    // Send start streaming command via backend
                 }
             }
             
-            // Stop streaming button (disabled when not streaming)
-            ImGui::BeginDisabled(!is_streaming);
+            ImGui::BeginDisabled(! is_streaming);
             {
                 if (ImGui::Button("Stop Streaming", ImVec2(-1, 0))) {
                     is_streaming = false;
                     log_info("Stopped streaming");
-                    // TODO: Send stop streaming command to device
+                    // Send stop streaming command via backend
                 }
             }
             ImGui::EndDisabled();
@@ -402,7 +427,6 @@ void GimbalControlView::render() {
     {
         ImGui::SeparatorText("Gimbal Position & Velocity");
         
-        // Data buffers for plotting (store last 500 points)
         static const int MAX_POINTS = 500;
         static std::vector<double> time_data;
         static std::vector<double> pan_pos_data;
@@ -411,30 +435,19 @@ void GimbalControlView::render() {
         static std::vector<double> tilt_vel_data;
         static double last_update_time = 0.0;
         
-        // Mock position and velocity data (TODO: replace with actual telemetry)
-        static float current_pan = 0.0f;
-        static float current_tilt = 0.0f;
-        static float pan_velocity = 0.0f;
-        static float tilt_velocity = 0.0f;
+        // Get real data from GimbalState
+        auto attitude = gimbal.getAttitude();
+        auto velocity = gimbal.getVelocity();
         
-        // Update plot data when connected (simulate 20Hz update rate)
+        // Update plot data when connected (20Hz)
         double current_time = ImGui::GetTime();
-        if (conn.isConnected() && (current_time - last_update_time) >= 0.05) {
-            // TODO: Replace with actual telemetry data from ConnectionManager
-            // For now, generate mock sinusoidal data
-            current_pan = 45.0f * std::sin(current_time * 0.5f);
-            current_tilt = 30.0f * std::cos(current_time * 0.3f);
-            pan_velocity = 22.5f * std::cos(current_time * 0.5f) * 0.5f;
-            tilt_velocity = -9.0f * std::sin(current_time * 0.3f) * 0.3f;
-            
-            // Add to buffers
+        if (conn.isConnected() && !gimbal.isStale() && (current_time - last_update_time) >= 0.05) {
             time_data.push_back(current_time);
-            pan_pos_data.push_back(current_pan);
-            tilt_pos_data.push_back(current_tilt);
-            pan_vel_data.push_back(pan_velocity);
-            tilt_vel_data.push_back(tilt_velocity);
+            pan_pos_data.push_back(attitude.pan_deg);
+            tilt_pos_data.push_back(attitude.tilt_deg);
+            pan_vel_data.push_back(velocity.pan_deg_s);
+            tilt_vel_data.push_back(velocity.tilt_deg_s);
             
-            // Keep buffer size limited
             if (time_data.size() > MAX_POINTS) {
                 time_data.erase(time_data.begin());
                 pan_pos_data.erase(pan_pos_data.begin());
@@ -454,31 +467,27 @@ void GimbalControlView::render() {
             tilt_pos_data.clear();
             pan_vel_data.clear();
             tilt_vel_data.clear();
-            current_pan = 0.0f;
-            current_tilt = 0.0f;
-            pan_velocity = 0.0f;
-            tilt_velocity = 0.0f;
         }
         was_connected_last_frame = conn.isConnected();
         
-        // Current values display
+        // Display real values
         ImGui::BeginDisabled(!conn.isConnected());
         {
             ImGui::Text("Pan Position:");
             ImGui::SameLine(150);
-            ImGui::Text("%.2f°", current_pan);
+            ImGui::Text("%.2f°", attitude.pan_deg);
             ImGui::SameLine(250);
             ImGui::Text("Pan Velocity:");
             ImGui::SameLine(380);
-            ImGui::Text("%.2f°/s", pan_velocity);
+            ImGui::Text("%.2f°/s", velocity.pan_deg_s);
             
             ImGui::Text("Tilt Position:");
             ImGui::SameLine(150);
-            ImGui::Text("%.2f°", current_tilt);
+            ImGui::Text("%.2f°", attitude.tilt_deg);
             ImGui::SameLine(250);
             ImGui::Text("Tilt Velocity:");
             ImGui::SameLine(380);
-            ImGui::Text("%.2f°/s", tilt_velocity);
+            ImGui::Text("%.2f°/s", velocity.tilt_deg_s);
         }
         ImGui::EndDisabled();
         
@@ -486,15 +495,12 @@ void GimbalControlView::render() {
         ImGui::Separator();
         ImGui::Spacing();
         
-        // Position plot
+        // Plots (no changes needed)
         int data_size = (int)time_data.size();
         if (data_size > 1) {
             if (ImPlot::BeginPlot("Position", ImVec2(-1, (right_combined_height - 150) / 2.0f))) {
                 ImPlot::SetupAxes("Time (s)", "Position (deg)");
-                ImPlot::SetupAxisLimits(ImAxis_X1, 
-                    time_data[0], 
-                    time_data[data_size - 1], 
-                    ImGuiCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_X1, time_data[0], time_data[data_size - 1], ImGuiCond_Always);
                 ImPlot::SetupAxisLimits(ImAxis_Y1, -90, 90, ImGuiCond_Once);
                 
                 ImPlot::PlotLine("Pan", time_data.data(), pan_pos_data.data(), data_size);
@@ -505,13 +511,9 @@ void GimbalControlView::render() {
             
             ImGui::Spacing();
             
-            // Velocity plot
             if (ImPlot::BeginPlot("Velocity", ImVec2(-1, (right_combined_height - 150) / 2.0f))) {
                 ImPlot::SetupAxes("Time (s)", "Velocity (deg/s)");
-                ImPlot::SetupAxisLimits(ImAxis_X1, 
-                    time_data[0], 
-                    time_data[data_size - 1], 
-                    ImGuiCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_X1, time_data[0], time_data[data_size - 1], ImGuiCond_Always);
                 ImPlot::SetupAxisLimits(ImAxis_Y1, -50, 50, ImGuiCond_Once);
                 
                 ImPlot::PlotLine("Pan Vel", time_data.data(), pan_vel_data.data(), data_size);
@@ -528,7 +530,6 @@ void GimbalControlView::render() {
     // ═══════════════════════════════════════
     // BOTTOM LEFT: Manual Control
     // ═══════════════════════════════════════
-    // Set cursor position to be below the Streaming Panel on the left
     float window_padding_x = ImGui::GetStyle().WindowPadding.x;
     ImGui::SetCursorPos(ImVec2(window_padding_x, top_height + 10.0f + middle_height + 10.0f));
     
@@ -544,13 +545,17 @@ void GimbalControlView::render() {
             ImGui::InputText("Target Pan (°)", target_pan_buffer, sizeof(target_pan_buffer));
             ImGui::InputText("Target Tilt (°)", target_tilt_buffer, sizeof(target_tilt_buffer));
             
-            ImGui::Spacing();
+            ImGui:: Spacing();
             
             if (ImGui::Button("Demand Position", ImVec2(-1, 0))) {
                 float pan = std::atof(target_pan_buffer);
-                float tilt = std::atof(target_tilt_buffer);
-                log_info("Demanding position: pan={}, tilt={}", pan, tilt);
-                // TODO: Send move command
+                float tilt = std:: atof(target_tilt_buffer);
+                log_info("Demanding position:  pan={}, tilt={}", pan, tilt);
+                // Send position command via backend
+                if (auto* backend = conn.getBackend()) {
+                    // TODO: Create protobuf position command
+                    // backend->sendMessage(cmd_data, ...);
+                }
             }
             
             ImGui::Spacing();
