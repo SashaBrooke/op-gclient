@@ -7,33 +7,33 @@
 #include <string>
 
 /**
- * Thread-safe shared gimbal state
- * Updated by comms backend, read by UI thread
+ * Thread-safe gimbal state matching op-controls firmware
  */
 class GimbalState {
 public:
-    struct Attitude {
-        float pan_deg = 0.0f;
-        float tilt_deg = 0.0f;
-        float roll_deg = 0.0f;
+    // Match op-controls gimbal_mode_e exactly
+    enum class Mode {
+        Free,           // GIMBAL_MODE_FREE
+        Armed,          // GIMBAL_MODE_ARMED
+        LowerLimit,     // GIMBAL_MODE_LOWER_LIMIT
+        UpperLimit      // GIMBAL_MODE_UPPER_LIMIT
     };
     
-    struct Velocity {
-        float pan_deg_s = 0.0f;
-        float tilt_deg_s = 0.0f;
-        float roll_deg_s = 0.0f;
+    struct Position {
+        float pan_deg = 0.0f;   // Current pan position
+        float tilt_deg = 0.0f;  // Future: tilt axis
     };
     
-    struct Mode {
-        enum class Type {
-            Idle,
-            Position,
-            Velocity,
-            Tracking,
-            Calibrating
-        };
-        Type type = Type::Idle;
-        bool is_enabled = false;
+    struct Setpoint {
+        float pan_deg = 0.0f;   // Pan position setpoint
+        float tilt_deg = 0.0f;  // Future: tilt setpoint
+    };
+    
+    struct Limits {
+        float pan_lower = 0.0f;
+        float pan_upper = 0.0f;
+        float tilt_lower = 0.0f;  // Future
+        float tilt_upper = 0.0f;  // Future
     };
     
     struct Health {
@@ -48,43 +48,37 @@ public:
         uint32_t error_flags = 0;
     };
     
-    static GimbalState& getInstance() {
-        static GimbalState instance;
-        return instance;
-    }
+    GimbalState() = default;
+    ~GimbalState() = default;
+    
+    GimbalState(const GimbalState&) = delete;
+    GimbalState& operator=(const GimbalState&) = delete;
     
     // Thread-safe getters
-    Attitude getAttitude() const;
-    Velocity getVelocity() const;
+    Position getPosition() const;
+    Setpoint getSetpoint() const;
     Mode getMode() const;
+    Limits getLimits() const;
     Health getHealth() const;
     std::chrono::steady_clock::time_point getLastUpdateTime() const;
     
-    // Thread-safe setters (called by comms backend)
-    void setAttitude(const Attitude& attitude);
-    void setVelocity(const Velocity& velocity);
-    void setMode(const Mode& mode);
+    // Thread-safe setters
+    void setPosition(const Position& position);
+    void setSetpoint(const Setpoint& setpoint);
+    void setMode(Mode mode);
+    void setLimits(const Limits& limits);
     void setHealth(const Health& health);
     
-    // Batch update (more efficient)
-    void updateAll(const Attitude& att, const Velocity& vel, const Mode& mode);
-    
-    // Check if data is stale
     bool isStale(std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(500)) const;
-    
-    // Reset all state
     void reset();
     
 private:
-    GimbalState() = default;
-    GimbalState(const GimbalState&) = delete;
-    void operator=(const GimbalState&) = delete;
-    
     mutable std::mutex mutex_;
     
-    Attitude attitude_;
-    Velocity velocity_;
-    Mode mode_;
+    Position position_;
+    Setpoint setpoint_;
+    Mode mode_ = Mode::Free;
+    Limits limits_;
     Health health_;
     std::chrono::steady_clock::time_point last_update_time_;
 };

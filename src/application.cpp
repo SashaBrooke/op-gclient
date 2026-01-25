@@ -1,3 +1,5 @@
+#include <stdexcept>
+#include <iostream>
 #include "application.hpp"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -5,16 +7,14 @@
 #include "util/window_handler.hpp"
 #include "util/logging.hpp"
 #include "util/events.hpp"
-#include "core/connection_manager.hpp"
-#include <stdexcept>
-#include <iostream>
 
 Application::Application(std::string window_title, int width, int height)
     : window_(nullptr)
     , window_title_(window_title)
     , window_width_(width)
     , window_height_(height)
-{
+    , gimbal_state_()
+    , comm_backend_(gimbal_state_) {
     log_info("=== Application Starting ===");
 }
 
@@ -127,10 +127,9 @@ void Application::init() {
     initGLFW();
     initGL3W();
     initImGui();
-    
-    // Create ViewManager - it handles all view changes via events
-    view_manager_ = std::make_unique<Rendering::ViewManager>();
-    
+
+    view_manager_ = std::make_unique<Rendering::ViewManager>(gimbal_state_, comm_backend_);
+
     log_info("Application initialized successfully");
 }
 
@@ -180,10 +179,9 @@ void Application::loop() {
 void Application::shutdown() {
     log_debug("Application:: shutdown() called");
 
-    // IMPORTANT: Disconnect any active connections FIRST
-    // This ensures serial/network cleanup happens before GLFW/ImGui shutdown
-    log_debug("Disconnecting any active connections");
-    ConnectionManager::getInstance().disconnect();
+    // Disconnect communication (stops I/O threads cleanly)
+    log_debug("Disconnecting communication");
+    comm_backend_.disconnect();
 
     // Clear view manager and its event subscriptions
     log_debug("Shutting down ViewManager");

@@ -1,19 +1,24 @@
 #ifndef GIMBAL_CONTROL_VIEW_HPP
 #define GIMBAL_CONTROL_VIEW_HPP
 
-#include "rendering/views.hpp"
 #include <vector>
 #include <string>
+#include "rendering/views.hpp"
+#include "core/gimbal_state.hpp"
+#include "core/communication_backend.hpp"
 
 namespace Rendering {
 
 class GimbalControlView : public View {
 public:
-    GimbalControlView();
+    GimbalControlView(GimbalState& gimbal_state, CommunicationBackend& comm_backend);
     void render() override;
 
 private:
     void refreshSerialPorts();
+
+    GimbalState& gimbal_state_;
+    CommunicationBackend& comm_backend_;
     
     // Serial port dropdown state
     std::vector<std::string> available_serial_ports_;

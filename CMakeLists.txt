@@ -36,14 +36,13 @@ set(SOURCES
     src/util/events.cpp
     src/util/window_handler.cpp
     src/util/logging.cpp
-    src/core/connection_manager.cpp
     src/core/communication_backend.cpp
     src/core/gimbal_state.cpp
     src/core/packet_codec.cpp
     src/core/packet_ack_manager.cpp
     src/core/serial_transport.cpp
     src/core/network_transport.cpp
-    src/core/stream_framer.cpp
+    src/core/packet_framer.cpp
     ${SERIAL_PORT_HELPER_SRC}
 )
 

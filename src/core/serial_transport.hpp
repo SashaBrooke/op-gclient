@@ -2,7 +2,7 @@
 #define SERIAL_TRANSPORT_HPP
 
 #include "core/transport_interface.hpp"
-#include "core/stream_framer.hpp"  // ✅ Use shared framer
+#include "core/packet_framer.hpp"
 #include <boost/asio.hpp>
 #include <thread>
 #include <mutex>
@@ -34,7 +34,7 @@ private:
     std::thread io_thread_;
     
     std::array<uint8_t, 1024> temp_read_buffer_;
-    StreamFramer framer_;  // ✅ Shared framing logic! 
+    PacketFramer framer_;
     
     PacketReceivedCallback packet_callback_;
     std::mutex callback_mutex_;

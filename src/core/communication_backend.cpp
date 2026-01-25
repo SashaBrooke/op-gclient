@@ -1,11 +1,9 @@
 #include "core/communication_backend.hpp"
-#include "core/gimbal_state.hpp"
 #include "util/logging.hpp"
 
-// TODO: Include your protobuf headers
-// #include "gimbal_messages.pb.h"
-
-CommunicationBackend::CommunicationBackend() {
+CommunicationBackend::CommunicationBackend(GimbalState& gimbal_state)
+    : gimbal_state_(gimbal_state)
+    , transport_(std::monostate{}) {  // Start with no transport
     log_debug("CommunicationBackend created");
 }
 
@@ -13,65 +11,141 @@ CommunicationBackend::~CommunicationBackend() {
     disconnect();
 }
 
-bool CommunicationBackend::connect(std::unique_ptr<ITransport> transport) {
-    if (transport_) {
-        log_warn("Already connected, disconnecting first");
-        disconnect();
-    }
+ITransport* CommunicationBackend::getActiveTransport() {
+    return std::visit([](auto&& arg) -> ITransport* {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::monostate>) {
+            return nullptr;
+        } else {
+            return arg.get();
+        }
+    }, transport_);
+}
+
+const ITransport* CommunicationBackend::getActiveTransport() const {
+    return std::visit([](auto&& arg) -> const ITransport* {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::monostate>) {
+            return nullptr;
+        } else {
+            return arg.get();
+        }
+    }, transport_);
+}
+
+CommunicationBackend::TransportType CommunicationBackend::getTransportType() const {
+    return std::visit([](auto&& arg) -> TransportType {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::monostate>) {
+            return TransportType::None;
+        } else if constexpr (std::is_same_v<T, std::unique_ptr<SerialTransport>>) {
+            return TransportType::Serial;
+        } else if constexpr (std::is_same_v<T, std::unique_ptr<NetworkTransport>>) {
+            return TransportType::Network;
+        }
+        return TransportType::None;
+    }, transport_);
+}
+
+bool CommunicationBackend::connectSerial(const std::string& port, uint32_t baud_rate) {
+    disconnect();  // Ensure clean state
     
-    if (!transport->open()) {
-        log_error("Failed to open transport");
+    log_info("Connecting to serial: {} @ {} baud", port, baud_rate);
+    
+    try {
+        auto serial = std::make_unique<SerialTransport>(port, baud_rate);
+        
+        if (!serial->open()) {
+            error_message_ = "Failed to open serial port";
+            log_error("{}", error_message_);
+            return false;
+        }
+        
+        // Create ACK manager
+        ack_manager_ = std::make_unique<PacketAckManager>(serial->getIoContext());
+        
+        // Set callback (runs on serial I/O thread!)
+        serial->setPacketReceivedCallback([this](const std::vector<uint8_t>& data) {
+            handleReceivedPacket(data);
+        });
+        
+        // Move into variant
+        transport_ = std::move(serial);
+        error_message_.clear();
+        
+        log_info("Serial connected successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        error_message_ = std::string("Exception: ") + e.what();
+        log_error("Serial connection failed: {}", e.what());
         return false;
     }
+}
+
+bool CommunicationBackend::connectNetwork(const std::string& host, uint16_t port) {
+    disconnect();
     
-    transport_ = std::move(transport);
+    log_info("Connecting to network: {}:{}", host, port);
     
-    // Create ACK manager using transport's io_context
-    ack_manager_ = std::make_unique<PacketAckManager>(transport_->getIoContext());
-    
-    // Set packet received callback
-    transport_->setPacketReceivedCallback([this](const std::vector<uint8_t>& data) {
-        handleReceivedPacket(data);
-    });
-    
-    log_info("Communication backend connected:  {}", transport_->getConnectionInfo());
-    return true;
+    try {
+        auto network = std::make_unique<NetworkTransport>(host, port);
+        
+        if (!network->open()) {
+            error_message_ = "Failed to connect to network";
+            log_error("{}", error_message_);
+            return false;
+        }
+        
+        ack_manager_ = std::make_unique<PacketAckManager>(network->getIoContext());
+        
+        network->setPacketReceivedCallback([this](const std::vector<uint8_t>& data) {
+            handleReceivedPacket(data);
+        });
+        
+        transport_ = std::move(network);
+        error_message_.clear();
+        
+        log_info("Network connected successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        error_message_ = std::string("Exception: ") + e.what();
+        log_error("Network connection failed: {}", e.what());
+        return false;
+    }
 }
 
 void CommunicationBackend::disconnect() {
-    if (!transport_) {
+    if (!isConnected()) {
         return;
     }
     
     log_info("Disconnecting communication backend");
     
-    // Cancel all pending ACKs FIRST (before closing transport)
     if (ack_manager_) {
         ack_manager_->cancelAll();
+        ack_manager_.reset();
     }
     
-    // Close transport (stops I/O thread)
-    if (transport_) {
-        transport_->close();
-        transport_.reset();  // ✅ Explicitly destroy transport
+    if (auto* transport = getActiveTransport()) {
+        transport->close();
     }
     
-    // Reset ACK manager
-    ack_manager_.reset();  // ✅ Explicitly destroy ACK manager
-    
-    // Reset gimbal state
-    GimbalState::getInstance().reset();
+    transport_ = std::monostate{};  // Clear variant
+    gimbal_state_.reset();
     
     log_info("Communication backend disconnected");
 }
 
 bool CommunicationBackend::isConnected() const {
-    return transport_ && transport_->isOpen();
+    auto* transport = getActiveTransport();
+    return transport && transport->isOpen();
 }
 
 std::string CommunicationBackend::getConnectionInfo() const {
-    if (transport_) {
-        return transport_->getConnectionInfo();
+    if (auto* transport = getActiveTransport()) {
+        return transport->getConnectionInfo();
     }
     return "Not connected";
 }
@@ -87,18 +161,35 @@ void CommunicationBackend::sendMessage(const std::vector<uint8_t>& protobuf_data
         return;
     }
     
-    // Get unique packet ID
+    // Validate payload size (max 62 bytes to fit in 64-byte packet)
+    if (protobuf_data.size() > PacketCodec::MAX_PAYLOAD_SIZE) {
+        log_error("Payload too large: {} bytes (max {})", 
+                  protobuf_data.size(), PacketCodec::MAX_PAYLOAD_SIZE);
+        if (ack_callback) {
+            ack_callback(false);
+        }
+        return;
+    }
+    
     uint32_t packet_id = ack_manager_->getNextPacketId();
     
-    // TODO: Embed packet_id into protobuf message header
-    // For now, assume it's already in protobuf_data
+    // Encode: [0xAA] [varint length] [payload]
+    // For payloads ≤62 bytes, varint is always 1 byte
+    std::vector<uint8_t> encoded_packet;
+    try {
+        encoded_packet = codec_.encode(protobuf_data);
+    } catch (const std::exception& e) {
+        log_error("Failed to encode packet: {}", e.what());
+        if (ack_callback) {
+            ack_callback(false);
+        }
+        return;
+    }
     
-    // Encode with varint length prefix
-    std::vector<uint8_t> encoded_packet = codec_.encode(protobuf_data);
+    log_debug("Sending message: packet_id={}, payload_size={}, total_size={}/{}", 
+              packet_id, protobuf_data.size(), encoded_packet.size(), 
+              PacketCodec::MAX_PACKET_SIZE);
     
-    log_debug("Sending message: packet_id={}, size={}", packet_id, encoded_packet.size());
-    
-    // Register for ACK if callback provided
     if (ack_callback) {
         ack_manager_->registerPacket(packet_id, 
             [ack_callback](bool success, uint32_t id) {
@@ -107,8 +198,9 @@ void CommunicationBackend::sendMessage(const std::vector<uint8_t>& protobuf_data
             timeout_ms);
     }
     
-    // Send via transport
-    transport_->writeAsync(encoded_packet);
+    if (auto* transport = getActiveTransport()) {
+        transport->writeAsync(encoded_packet);
+    }
 }
 
 void CommunicationBackend::handleReceivedPacket(const std::vector<uint8_t>& packet_data) {
@@ -117,48 +209,8 @@ void CommunicationBackend::handleReceivedPacket(const std::vector<uint8_t>& pack
 }
 
 void CommunicationBackend::decodeAndProcessMessage(const std::vector<uint8_t>& data) {
-    // TODO: Replace with actual protobuf parsing
-    // This runs on the transport's I/O thread
-    
-    /*
-    GimbalMessage msg;
-    if (! msg.ParseFromArray(data.data(), data.size())) {
-        log_error("Failed to parse protobuf message");
-        return;
-    }
-    
-    if (msg.has_telemetry()) {
-        auto& telem = msg.telemetry();
-        
-        GimbalState::Attitude att;
-        att.pan_deg = telem.pan_deg();
-        att.tilt_deg = telem.tilt_deg();
-        att.roll_deg = telem.roll_deg();
-        
-        GimbalState::Velocity vel;
-        vel.pan_deg_s = telem.pan_vel();
-        vel.tilt_deg_s = telem.tilt_vel();
-        vel.roll_deg_s = telem.roll_vel();
-        
-        GimbalState::Mode mode;
-        mode.type = static_cast<GimbalState::Mode::Type>(telem.mode());
-        mode.is_enabled = telem.enabled();
-        
-        GimbalState::getInstance().updateAll(att, vel, mode);
-        
-    } else if (msg.has_ack()) {
-        uint32_t packet_id = msg.ack().packet_id();
-        ack_manager_->handleAck(packet_id);
-        
-    } else if (msg.has_error()) {
-        GimbalState::Health health;
-        health.status = GimbalState::Health::Status::Error;
-        health.message = msg.error().message();
-        health.error_flags = msg.error().flags();
-        
-        GimbalState::getInstance().setHealth(health);
-    }
-    */
+    // TODO: Parse protobuf matching op-controls feat/protobuf-commands
+    // This updates gimbal_state_ (thread-safe via mutex)
     
     log_debug("Message processed");
 }

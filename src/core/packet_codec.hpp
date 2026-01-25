@@ -3,48 +3,42 @@
 
 #include <vector>
 #include <cstdint>
-#include <optional>
-#include <functional>
 
 /**
- * Abstract packet codec interface
- * Handles encoding/decoding of packets with varint length prefix
+ * Packet codec for op-controls protocol:
+ * [0xAA sync byte] [1-byte varint length] [payload]
+ * 
+ * Total packet size: max 64 bytes
+ * Therefore: max payload = 64 - 1 (sync) - 1 (length) = 62 bytes
+ * 
+ * Since payload is max 62 bytes, the varint length is always 1 byte.
  */
-class IPacketCodec {
-public: 
-    virtual ~IPacketCodec() = default;
-    
-    /**
-     * Encode a protobuf message to bytes with varint length prefix
-     * @param message_data Serialized protobuf message
-     * @return Complete packet (varint + payload)
-     */
-    virtual std::vector<uint8_t> encode(const std::vector<uint8_t>& message_data) = 0;
-    
-    /**
-     * Try to decode a varint from buffer
-     * @param buffer Input buffer
-     * @param out_value Decoded value
-     * @param out_bytes_consumed Number of bytes consumed
-     * @return true if varint successfully decoded
-     */
-    virtual bool decodeVarint(const std::vector<uint8_t>& buffer, 
-                             uint64_t& out_value, 
-                             size_t& out_bytes_consumed) = 0;
-};
-
-/**
- * Standard varint implementation (protobuf style)
- */
-class VarintPacketCodec : public IPacketCodec {
+class PacketCodec {
 public:
-    std::vector<uint8_t> encode(const std::vector<uint8_t>& message_data) override;
-    bool decodeVarint(const std::vector<uint8_t>& buffer, 
-                     uint64_t& out_value, 
-                     size_t& out_bytes_consumed) override;
+    static constexpr uint8_t SYNC_BYTE = 0xAA;
+    static constexpr size_t MAX_PACKET_SIZE = 64;  // Total packet size
+    static constexpr size_t MAX_PAYLOAD_SIZE = 62;  // 64 - 1 (sync) - 1 (length)
     
-private:
-    std::vector<uint8_t> encodeVarint(uint64_t value);
+    /**
+     * Encode payload with sync byte and varint length prefix
+     * Returns: [0xAA] [varint length] [payload]
+     * 
+     * @throws std::runtime_error if payload exceeds MAX_PAYLOAD_SIZE
+     */
+    std::vector<uint8_t> encode(const std::vector<uint8_t>& payload);
+    
+    /**
+     * Encode varint (though with max 62, this is always 1 byte)
+     */
+    static std::vector<uint8_t> encodeVarint(uint64_t value);
+    
+    /**
+     * Try to decode varint length from buffer
+     * Returns true if varint successfully decoded
+     */
+    bool decodeVarint(const std::vector<uint8_t>& buffer, 
+                     uint64_t& out_length, 
+                     size_t& out_bytes_consumed);
 };
 
 #endif // PACKET_CODEC_HPP

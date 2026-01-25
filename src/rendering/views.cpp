@@ -1,16 +1,18 @@
+#include <memory>
 #include "rendering/views.hpp"
 #include "rendering/views/gimbal_control_view.hpp"
 #include "util/logging.hpp"
 #include "util/events.hpp"
-#include <memory>
 
 namespace Rendering {
 
-ViewManager::ViewManager() {
+ViewManager::ViewManager(GimbalState& gimbal_state, CommunicationBackend& comm_backend)
+    : gimbal_state_(gimbal_state)
+    , comm_backend_(comm_backend) {
     log_debug("ViewManager created");
     
     // Set initial view
-    setView(std::make_shared<GimbalControlView>());
+    setView(std::make_shared<GimbalControlView>(gimbal_state_, comm_backend_));
     
     // Subscribe to view change events
     Events::EventQueue::getInstance().subscribe("views/set_view", [this](const Events::Event& event) {

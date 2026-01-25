@@ -1,18 +1,23 @@
 #include "core/gimbal_state.hpp"
 
-GimbalState::Attitude GimbalState::getAttitude() const {
+GimbalState::Position GimbalState::getPosition() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return attitude_;
+    return position_;
 }
 
-GimbalState::Velocity GimbalState::getVelocity() const {
+GimbalState::Setpoint GimbalState::getSetpoint() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return velocity_;
+    return setpoint_;
 }
 
 GimbalState::Mode GimbalState::getMode() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return mode_;
+}
+
+GimbalState::Limits GimbalState::getLimits() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return limits_;
 }
 
 GimbalState::Health GimbalState::getHealth() const {
@@ -25,35 +30,33 @@ std::chrono::steady_clock::time_point GimbalState::getLastUpdateTime() const {
     return last_update_time_;
 }
 
-void GimbalState::setAttitude(const Attitude& attitude) {
+void GimbalState::setPosition(const Position& position) {
     std::lock_guard<std::mutex> lock(mutex_);
-    attitude_ = attitude;
+    position_ = position;
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
-void GimbalState::setVelocity(const Velocity& velocity) {
+void GimbalState::setSetpoint(const Setpoint& setpoint) {
     std::lock_guard<std::mutex> lock(mutex_);
-    velocity_ = velocity;
+    setpoint_ = setpoint;
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
-void GimbalState::setMode(const Mode& mode) {
+void GimbalState::setMode(Mode mode) {
     std::lock_guard<std::mutex> lock(mutex_);
     mode_ = mode;
+    last_update_time_ = std::chrono::steady_clock::now();
+}
+
+void GimbalState::setLimits(const Limits& limits) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    limits_ = limits;
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
 void GimbalState::setHealth(const Health& health) {
     std::lock_guard<std::mutex> lock(mutex_);
     health_ = health;
-    last_update_time_ = std::chrono::steady_clock::now();
-}
-
-void GimbalState::updateAll(const Attitude& att, const Velocity& vel, const Mode& mode) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    attitude_ = att;
-    velocity_ = vel;
-    mode_ = mode;
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
@@ -66,9 +69,10 @@ bool GimbalState::isStale(std::chrono::milliseconds timeout_ms) const {
 
 void GimbalState::reset() {
     std::lock_guard<std::mutex> lock(mutex_);
-    attitude_ = Attitude{};
-    velocity_ = Velocity{};
-    mode_ = Mode{};
+    position_ = Position{};
+    setpoint_ = Setpoint{};
+    mode_ = Mode::Free;
+    limits_ = Limits{};
     health_ = Health{};
     last_update_time_ = std::chrono::steady_clock::time_point{};
 }

@@ -6,7 +6,7 @@ NetworkTransport::NetworkTransport(const std::string& host, uint16_t port)
     , port_(port)
     , socket_(io_context_)
     , work_guard_(boost::asio::make_work_guard(io_context_))
-    , framer_([this](const std::vector<uint8_t>& packet) {  // ✅ CHANGED:  Initialize framer with callback
+    , framer_([this](const std::vector<uint8_t>& packet) {
           // Framer delivers complete packets
           std::lock_guard<std::mutex> lock(callback_mutex_);
           if (packet_callback_) {
@@ -14,7 +14,6 @@ NetworkTransport::NetworkTransport(const std::string& host, uint16_t port)
           }
       })
     , is_connected_(false) {
-    // ✅ REMOVED: read_state_, expected_payload_size_ initialization
 }
 
 NetworkTransport::~NetworkTransport() {
@@ -28,7 +27,7 @@ bool NetworkTransport::open() {
     }
     
     try {
-        log_info("Connecting to network:  {}:{}", host_, port_);
+        log_info("Connecting to network: {}:{}", host_, port_);
         
         // Resolve hostname
         boost::asio::ip::tcp::resolver resolver(io_context_);
@@ -52,7 +51,7 @@ bool NetworkTransport::open() {
         return true;
         
     } catch (const boost::system::system_error& e) {
-        log_error("Failed to connect to network:  {}", e.what());
+        log_error("Failed to connect to network: {}", e.what());
         return false;
     }
 }
@@ -64,7 +63,7 @@ void NetworkTransport::close() {
     
     log_info("Closing network transport");
     
-    is_connected_ = false;  // ✅ Set this FIRST to prevent new operations
+    is_connected_ = false;
     
     try {
         socket_.close();
@@ -117,13 +116,13 @@ void NetworkTransport::setPacketReceivedCallback(PacketReceivedCallback callback
     packet_callback_ = callback;
 }
 
-std:: string NetworkTransport::getConnectionInfo() const {
+std::string NetworkTransport::getConnectionInfo() const {
     return host_ + ":" + std::to_string(port_);
 }
 
 void NetworkTransport::startAsyncRead() {
     socket_.async_read_some(
-        boost::asio:: buffer(temp_read_buffer_),
+        boost::asio::buffer(temp_read_buffer_),
         [this](const boost::system::error_code& ec, size_t bytes_read) {
             handleReadSome(ec, bytes_read);
         }
@@ -132,24 +131,15 @@ void NetworkTransport::startAsyncRead() {
 
 void NetworkTransport::handleReadSome(const boost::system::error_code& ec, size_t bytes_read) {
     if (ec) {
-        if (ec != boost::asio::error:: operation_aborted) {
-            log_error("Network read error:  {}", ec.message());
+        if (ec != boost::asio::error::operation_aborted) {
+            log_error("Network read error: {}", ec.message());
         }
         return;
     }
     
     log_debug("Read {} bytes from network", bytes_read);
-    
-    // ✅ CHANGED: Just feed data to framer - it handles everything! 
+
     framer_.feedData(temp_read_buffer_.data(), bytes_read);
     
     startAsyncRead();
-    
-    // ✅ REMOVED: All the manual state machine logic: 
-    // - read_state_ == ReadState::READING_VARINT
-    // - varint_buffer manipulation
-    // - codec_.decodeVarint()
-    // - read_state_ == ReadState:: READING_PAYLOAD
-    // - payload_buffer manipulation
-    // - packet_callback_() call
 }

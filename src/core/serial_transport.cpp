@@ -60,7 +60,7 @@ void SerialTransport:: close() {
     
     log_info("Closing serial transport");
     
-    is_open_ = false;  // ✅ Set this FIRST to prevent new operations
+    is_open_ = false;
     
     try {
         serial_port_.close();

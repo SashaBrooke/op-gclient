@@ -2,7 +2,7 @@
 #define NETWORK_TRANSPORT_HPP
 
 #include "core/transport_interface.hpp"
-#include "core/stream_framer.hpp"  // ✅ CHANGED: Use shared framer instead of packet_codec
+#include "core/packet_framer.hpp"
 #include <boost/asio.hpp>
 #include <thread>
 #include <mutex>
@@ -32,24 +32,17 @@ private:
     uint16_t port_;
     
     boost::asio::io_context io_context_;
-    boost::asio::ip::tcp:: socket socket_;
+    boost::asio::ip::tcp::socket socket_;
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
     std::thread io_thread_;
     
-    std:: array<uint8_t, 1024> temp_read_buffer_;
-    StreamFramer framer_;  // ✅ CHANGED: Use StreamFramer instead of manual state machine
+    std::array<uint8_t, 1024> temp_read_buffer_;
+    PacketFramer framer_;
     
     PacketReceivedCallback packet_callback_;
     std::mutex callback_mutex_;
     
     bool is_connected_;
-    
-    // ✅ REMOVED: All these are now inside StreamFramer
-    // std:: vector<uint8_t> varint_buffer_;
-    // std::vector<uint8_t> payload_buffer_;
-    // ReadState read_state_;
-    // uint64_t expected_payload_size_;
-    // VarintPacketCodec codec_;
 };
 
 #endif // NETWORK_TRANSPORT_HPP
