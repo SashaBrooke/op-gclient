@@ -15,8 +15,6 @@ public:
     enum class Mode {
         Free,           // GIMBAL_MODE_FREE
         Armed,          // GIMBAL_MODE_ARMED
-        LowerLimit,     // GIMBAL_MODE_LOWER_LIMIT
-        UpperLimit      // GIMBAL_MODE_UPPER_LIMIT
     };
     
     struct Position {
@@ -60,6 +58,8 @@ public:
     Mode getMode() const;
     Limits getLimits() const;
     Health getHealth() const;
+    bool isStreaming() const;
+    int getStreamRateHz() const;
     std::chrono::steady_clock::time_point getLastUpdateTime() const;
     
     // Thread-safe setters
@@ -68,19 +68,24 @@ public:
     void setMode(Mode mode);
     void setLimits(const Limits& limits);
     void setHealth(const Health& health);
+    void setStreaming(bool streaming, int rate_hz);
     
     bool isStale(std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(500)) const;
     void reset();
     
 private:
     mutable std::mutex mutex_;
-    
+
     Position position_;
     Setpoint setpoint_;
     Mode mode_ = Mode::Free;
     Limits limits_;
     Health health_;
     std::chrono::steady_clock::time_point last_update_time_;
+
+    // Streaming state
+    bool streaming_ = false;
+    int stream_rate_hz_ = 0;
 };
 
 #endif // GIMBAL_STATE_HPP

@@ -25,6 +25,16 @@ GimbalState::Health GimbalState::getHealth() const {
     return health_;
 }
 
+bool GimbalState::isStreaming() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return streaming_;
+}
+
+int GimbalState::getStreamRateHz() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stream_rate_hz_;
+}
+
 std::chrono::steady_clock::time_point GimbalState::getLastUpdateTime() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return last_update_time_;
@@ -60,6 +70,13 @@ void GimbalState::setHealth(const Health& health) {
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
+void GimbalState::setStreaming(bool streaming, int rate_hz) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    streaming_ = streaming;
+    stream_rate_hz_ = rate_hz;
+    last_update_time_ = std::chrono::steady_clock::now();
+}
+
 bool GimbalState::isStale(std::chrono::milliseconds timeout_ms) const {
     std::lock_guard<std::mutex> lock(mutex_);
     auto now = std::chrono::steady_clock::now();
@@ -75,4 +92,6 @@ void GimbalState::reset() {
     limits_ = Limits{};
     health_ = Health{};
     last_update_time_ = std::chrono::steady_clock::time_point{};
+    streaming_ = false;
+    stream_rate_hz_ = 0;
 }

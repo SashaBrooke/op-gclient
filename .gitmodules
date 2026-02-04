@@ -14,3 +14,6 @@
 [submodule "ext/implot"]
 	path = ext/implot
 	url = https://github.com/epezent/implot.git
+[submodule "ext/op-comms"]
+	path = ext/op-comms
+	url = https://github.com/SashaBrooke/op-comms.git

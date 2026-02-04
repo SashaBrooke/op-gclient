@@ -43,6 +43,7 @@ set(SOURCES
     src/core/serial_transport.cpp
     src/core/network_transport.cpp
     src/core/packet_framer.cpp
+    src/core/command.cpp
     ${SERIAL_PORT_HELPER_SRC}
 )
 
@@ -68,6 +69,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     gl3w
     spdlog::spdlog
     Boost::system
+    opcomms_proto
     ${Protobuf_LIBRARIES}
     ${CMAKE_DL_LIBS}
 )

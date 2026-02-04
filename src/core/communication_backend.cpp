@@ -1,9 +1,12 @@
 #include "core/communication_backend.hpp"
 #include "util/logging.hpp"
+#include "extcomm.pb.h"
+
+using namespace opcomms::extcomm;
 
 CommunicationBackend::CommunicationBackend(GimbalState& gimbal_state)
     : gimbal_state_(gimbal_state)
-    , transport_(std::monostate{}) {  // Start with no transport
+    , transport_(std::monostate{}) { // Start with no transport
     log_debug("CommunicationBackend created");
 }
 
@@ -48,7 +51,7 @@ CommunicationBackend::TransportType CommunicationBackend::getTransportType() con
 }
 
 bool CommunicationBackend::connectSerial(const std::string& port, uint32_t baud_rate) {
-    disconnect();  // Ensure clean state
+    disconnect(); // Ensure clean state
     
     log_info("Connecting to serial: {} @ {} baud", port, baud_rate);
     
@@ -132,7 +135,7 @@ void CommunicationBackend::disconnect() {
         transport->close();
     }
     
-    transport_ = std::monostate{};  // Clear variant
+    transport_ = std::monostate{}; // Clear variant
     gimbal_state_.reset();
     
     log_info("Communication backend disconnected");
@@ -191,10 +194,10 @@ void CommunicationBackend::sendMessage(const std::vector<uint8_t>& protobuf_data
               PacketCodec::MAX_PACKET_SIZE);
     
     if (ack_callback) {
-        ack_manager_->registerPacket(packet_id, 
+        ack_manager_->registerPacket(packet_id,
             [ack_callback](bool success, uint32_t id) {
                 ack_callback(success);
-            }, 
+            },
             timeout_ms);
     }
     

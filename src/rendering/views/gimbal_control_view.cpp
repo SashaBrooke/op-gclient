@@ -240,15 +240,8 @@ void GimbalControlView::render() {
                     ImGui::Text("ARMED");
                     ImGui::PopStyleColor();
                     break;
-                case GimbalState::Mode::LowerLimit:
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.0f, 1.0f));
-                    ImGui::Text("LOWER LIMIT");
-                    ImGui::PopStyleColor();
-                    break;
-                case GimbalState::Mode::UpperLimit:
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.0f, 1.0f));
-                    ImGui::Text("UPPER LIMIT");
-                    ImGui::PopStyleColor();
+                default:
+                    ImGui::Text("UNKNOWN");
                     break;
             }
             
@@ -333,27 +326,9 @@ void GimbalControlView::render() {
     {
         ImGui::SeparatorText("Streaming");
         
-        static bool is_streaming = false;
-        static bool was_connected = false;
-        
-        bool currently_connected = comm.isConnected();
-        
-        // Auto-enable streaming on serial connection
-        if (currently_connected && !was_connected) {
-            if (connection_type == TransType::Serial) {
-                is_streaming = true;
-                log_info("Serial connected - streaming enabled by default");
-            } else {
-                is_streaming = false;
-            }
-        }
-        
-        // Auto-disable on disconnect
-        if (!currently_connected && was_connected) {
-            is_streaming = false;
-        }
-        
-        was_connected = currently_connected;
+        bool is_streaming = gimbal_state_.isStreaming();
+
+        // TODO: Investigate how gimal state is reset on disconnection
         
         ImGui::Text("Status:");
         ImGui::SameLine();
@@ -385,11 +360,6 @@ void GimbalControlView::render() {
                     const bool is_selected = (stream_rate_index == n);
                     if (ImGui::Selectable(stream_rate_options[n].first, is_selected)) {
                         stream_rate_index = n;
-                        if (is_streaming) {
-                            int rate = stream_rate_options[stream_rate_index].second;
-                            log_info("Stream rate changed to {} Hz", rate);
-                            // TODO: Send rate change command
-                        }
                     }
                     if (is_selected) ImGui::SetItemDefaultFocus();
                 }
@@ -401,19 +371,19 @@ void GimbalControlView::render() {
             ImGui::Spacing();
             
             if (ImGui::Button("Start Streaming", ImVec2(-1, 0))) {
-                if (!is_streaming) {
-                    is_streaming = true;
-                    int rate = stream_rate_options[stream_rate_index].second;
-                    log_info("Started streaming at {} Hz", rate);
-                    // TODO: Send start streaming command
-                }
+                int rate = stream_rate_options[stream_rate_index].second;
+                gimbal_state_.setStreaming(true, rate);
+                log_info("Started streaming at {} Hz", rate);
+                
+                // TODO: Send start streaming command
             }
             
             ImGui::BeginDisabled(!is_streaming);
             {
                 if (ImGui::Button("Stop Streaming", ImVec2(-1, 0))) {
-                    is_streaming = false;
+                    gimbal_state_.setStreaming(false, 0);
                     log_info("Stopped streaming");
+
                     // TODO: Send stop streaming command
                 }
             }
@@ -426,7 +396,7 @@ void GimbalControlView::render() {
     ImGui::SameLine();
     
     // ═══════════════════════════════════════
-    // MIDDLE & BOTTOM RIGHT: Position Plot (NO VELOCITY)
+    // MIDDLE & BOTTOM RIGHT: Position Plot
     // ═══════════════════════════════════════
     float right_combined_height = middle_height + bottom_height + 10.0f;
     ImGui::BeginChild("PositionPanel", ImVec2(right_width, right_combined_height), true);
@@ -478,10 +448,6 @@ void GimbalControlView::render() {
             ImGui::Text("Pan Setpoint:");
             ImGui::SameLine(150);
             ImGui::Text("%.2f°", setpoint.pan_deg);
-            
-            ImGui::Text("Error:");
-            ImGui::SameLine(150);
-            ImGui::Text("%.2f°", setpoint.pan_deg - position.pan_deg);
         }
         ImGui::EndDisabled();
         

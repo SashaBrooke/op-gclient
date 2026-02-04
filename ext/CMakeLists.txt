@@ -61,3 +61,25 @@ target_include_directories(gl3w PUBLIC ${GL3W_DIR}/include)
 
 # spdlog
 add_subdirectory(spdlog)
+
+# op-comms protobuf
+set(OPCOMMS_PROTO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/op-comms)
+
+protobuf_generate_cpp(
+    OPCOMMS_PROTO_SRCS
+    OPCOMMS_PROTO_HDRS
+    ${OPCOMMS_PROTO_DIR}/extcomm.proto
+)
+
+add_library(opcomms_proto STATIC
+    ${OPCOMMS_PROTO_SRCS}
+    ${OPCOMMS_PROTO_HDRS}
+)
+
+target_link_libraries(opcomms_proto
+    PUBLIC protobuf::libprotobuf
+)
+
+target_include_directories(opcomms_proto PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}
+)
